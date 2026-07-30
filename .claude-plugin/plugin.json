@@ -1,0 +1,19 @@
+{
+  "name": "mle-setup",
+  "version": "0.1.0",
+  "description": "Agent setup for B2B ML consulting: spec->plan->TDD->verification workflow, simplicity (code ladder and ML ladder), production incidents, LLM evals, scoping, handoff, and delivery audit. Self-contained: vendors superpowers and ponytail (MIT) and adds consulting skills.",
+  "author": {
+    "name": "G4rb4sh"
+  },
+  "license": "MIT",
+  "hooks": "./hooks/hooks.json",
+  "keywords": [
+    "skills",
+    "tdd",
+    "debugging",
+    "simplicity",
+    "ml",
+    "consulting",
+    "workflows"
+  ]
+}

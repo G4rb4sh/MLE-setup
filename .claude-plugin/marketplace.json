@@ -1,0 +1,19 @@
+{
+  "name": "mle-setup",
+  "description": "Self-contained marketplace: unique agent plugin for B2B ML consulting.",
+  "owner": {
+    "name": "G4rb4sh"
+  },
+  "metadata": {
+    "description": "Unique, self-contained plugin: workflow, simplicity, and ML consulting skills.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "mle-setup",
+      "description": "Agent setup for B2B ML consulting (workflow + simplicity + consulting).",
+      "version": "0.1.0",
+      "source": "./"
+    }
+  ]
+}

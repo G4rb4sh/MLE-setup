@@ -1,0 +1,28 @@
+# NOTICE — componentes de terceros vendorizados
+
+Este plugin (`mle-setup`) incluye software de terceros redistribuido bajo la
+licencia MIT. Se conservan los avisos de copyright originales.
+
+## superpowers
+- Origen: https://github.com/obra/superpowers
+- Copyright (c) 2025 Jesse Vincent
+- Licencia: MIT
+- Skills vendorizadas (verbatim) en `skills/`: brainstorming,
+  dispatching-parallel-agents, executing-plans, finishing-a-development-branch,
+  receiving-code-review, requesting-code-review, subagent-driven-development,
+  systematic-debugging, test-driven-development, using-git-worktrees,
+  using-superpowers, verification-before-completion, writing-plans,
+  writing-skills.
+
+## ponytail
+- Origen: https://github.com/DietrichGebert/ponytail
+- Copyright (c) 2026 DietrichGebert
+- Licencia: MIT
+- Skills vendorizadas en `skills/`: ponytail, ponytail-review, ponytail-audit,
+  ponytail-debt. Las skills `ponytail` y `ponytail-review` incluyen adiciones
+  propias marcadas (escalera de ML, tag `ml-over`).
+
+El texto completo de la licencia MIT que cubre estos componentes esta en
+`LICENSE`. Las skills de consultoria (repo-bootstrap, pr-review, ml-repro, eda,
+llm-eval, prod-incident, scoping, status-update, pre-delivery-audit, handoff,
+kb, setup-gardener) y los agents son obra original de este repositorio.
