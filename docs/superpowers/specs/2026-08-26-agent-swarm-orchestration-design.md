@@ -79,7 +79,7 @@ Anything these two do not fit is authored ad hoc by the orchestrating agent via
 | `finders` | integer | 3 | width of the finder pool |
 | `verifyVotes` | integer | 2 | adversarial votes per finding; `0` skips verification |
 
-Returns `{ confirmed: [...], rejected: [...], dropped: [...] }`.
+Returns `{ confirmed: [...], rejected: [...], dropped: [...], unexpectedWrites: [...] }`.
 
 `dropped` is explicit: when the factory bounds its own coverage, it says so
 rather than silently truncating.
@@ -122,6 +122,20 @@ fixer burns rounds repairing pre-existing failures.
 
 This is `verification-before-completion` made mechanical: evidence precedes the
 claim, and it does not depend on an agent being honest.
+
+### swarm-scan is read-only by detection, not by construction
+
+Since `agent` is ignored, a scan subagent has the full toolset and could write.
+The prompts instruct read-only, but prompts are not a guarantee.
+
+`swarm-scan` therefore captures `git status --porcelain` before and after the
+fan-out and returns any path that changed under `unexpectedWrites`. A
+read-only scan that reports a non-empty `unexpectedWrites` has misbehaved and
+the orchestrator says so instead of silently absorbing it. Cost: two shell
+calls, no agents.
+
+Same philosophy as the ownership check — cheap deterministic detection beats
+prevention that cannot actually be enforced.
 
 ## Efficiency
 
@@ -179,15 +193,52 @@ The skill teaches a default that is small, and makes escalation explicit:
 - "Be thorough": large finder pool, 3-5 vote adversarial verification, and a
   completeness critic seeding another round.
 
-## Open questions for implementation
+## Verified findings
 
-1. Does `ctx.agent(prompt, { agent })` accept built-in agent names such as
-   `research`, or only custom ones? `sources: "web"` depends on it. Verify
-   before relying on the parameter; if it does not, web search must reach the
-   subagent another way.
-2. Confirm the directory convention for plugin-contributed extensions. The RPC
-   surface exposes plugin extension discovery, but the on-disk layout inside a
-   plugin is unverified. Scaffold, then confirm with `extensions_manage list`.
+Both open questions were resolved empirically with throwaway probe factories
+before implementation started.
+
+**The `agent` option is silently ignored.** `ctx.agent(prompt, { agent })` was
+probed with `research`, `explore`, `mle-setup:researcher`, and the deliberately
+invalid `definitely-not-a-real-agent`. All four ran, none errored, and all four
+self-reported as the default agent. An invalid agent name does not fail — it
+degrades silently, which is the worst available failure mode.
+
+Consequence: **a factory subagent cannot be made read-only by construction.**
+An earlier draft of this design claimed the wide fan-out would be physically
+incapable of writing because it ran as `researcher`. That claim was false and
+has been removed. Do not pass `agent` in either factory; it buys nothing and
+implies a guarantee that does not exist.
+
+The replacement follows the same principle as the ownership check: **detect
+deterministically instead of preventing by prompt.** `swarm-scan` captures
+`git status --porcelain` before and after the fan-out and reports any path a
+supposedly read-only scan touched. Zero agents, no reliance on prompt
+compliance.
+
+Session-level `onPermissionRequest` was considered as a real enforcement
+mechanism and rejected: it applies to the whole session, so it would also
+constrain the orchestrating agent, and whether it intercepts factory subagent
+tool calls at all is unverified.
+
+**Plugin-contributed extensions load from `<plugin>/extensions/<name>/extension.mjs`.**
+Confirmed by scaffolding one inside the installed plugin and observing it load
+as `plugin:mle-setup:probe-layout`. The factories can therefore ship with
+MLE-setup and be available in every repo.
+
+**Factory subagents can write inside the workspace, and run with `cwd` set to
+the session's workspace root.** All three probed variants created a file with
+the `bash` tool and the write was confirmed on disk. `swarm-build` is viable as
+designed: subagents edit files directly, and no patch-application indirection is
+needed.
+
+A first probe appeared to show subagents could not write at all, but it was
+confounded: it targeted `os.tmpdir()`, and the refusals cited the *path* being
+outside the workspace, not a missing tool. Re-probing inside the repo reversed
+the result. The relevant boundary is the workspace, not the toolset.
+
+That same probe re-confirmed the `agent` finding from the other direction: the
+run with `agent: "definitely-not-a-real-agent"` wrote successfully.
 
 ## Rejected alternatives
 
