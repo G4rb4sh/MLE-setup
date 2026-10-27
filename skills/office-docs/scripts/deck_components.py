@@ -9,12 +9,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pptx.enum.shapes import PP_PLACEHOLDER
 from pptx.parts.image import Image as PptxImage
 
-from brand import NODE_SHAPES
-from deck_prims import CAPTION_H, est_lines
+from brand import NODE_SHAPES, BrandError
+from deck_prims import CAPTION_H, EMU_PER_IN, est_lines
 
 NODE_STATES = ("done", "planned")
+TITLE_PLACEHOLDERS = (PP_PLACEHOLDER.TITLE, PP_PLACEHOLDER.CENTER_TITLE)
 
 
 def _gap(pt: float) -> list[dict]:
@@ -56,7 +58,39 @@ class Components:
         return "primary" if (b + 0.05) / (a + 0.05) >= 3 else "on_primary"
 
     # ── slide factories ──
+    def _layout_slide(self, role, title, *texts):
+        """Slide on the template layout mapped to `role` (None if unmapped).
+
+        The title goes into the title placeholder (named "title"); each non-empty text in `texts`
+        fills the next subtitle placeholder, then body placeholders top to bottom. Placeholders
+        left empty are removed so the slide shows no "Click to add" prompts.
+        """
+        layout = self.layout(role)
+        if layout is None:
+            return None
+        s = self.prs.slides.add_slide(layout)
+        self.page += 1
+        phs = list(s.placeholders)
+        t = next((ph for ph in phs if ph.placeholder_format.type in TITLE_PLACEHOLDERS), None)
+        if t is None:
+            raise BrandError(f"deck.layouts.{role}: layout {layout.name!r} has no title placeholder")
+        t.name = "title"
+        t.text_frame.text = title
+        slots = sorted(
+            (ph for ph in phs if ph.placeholder_format.type in (PP_PLACEHOLDER.SUBTITLE, PP_PLACEHOLDER.BODY)),
+            key=lambda ph: (ph.placeholder_format.type != PP_PLACEHOLDER.SUBTITLE, ph.top),
+        )
+        for ph, text in zip(slots, [x for x in texts if x]):
+            ph.text_frame.text = text
+        for ph in phs:
+            if not (ph.has_text_frame and ph.text_frame.text.strip()):
+                ph._element.getparent().remove(ph._element)
+        return s
+
     def title_slide(self, kicker, title, subtitle):
+        s = self._layout_slide("title", title, subtitle, kicker)
+        if s is not None:
+            return s
         s = self.blank_slide("primary")
         w = self.W - 2.1
         self.rect(s, 0, 0, 0.28, self.H, fill="highlight")
@@ -71,6 +105,11 @@ class Components:
 
     def section_slide(self, number, title, image=None, caption=None):
         """Section divider; with `image` the big number is replaced by the picture."""
+        s = self._layout_slide("section", title, f"SECCIÓN {number}")
+        if s is not None:
+            if image:
+                self.image(s, image, self.W - 4.83, 0.9, 4.2, 5.7, caption=caption)
+            return s
         s = self.blank_slide("primary")
         tw = 7.4
         if image:
@@ -86,12 +125,20 @@ class Components:
 
     def content_slide(self, kicker, title):
         """Slide with header and footer; returns (slide, top of the body in inches)."""
+        s = self._layout_slide("content", title, kicker)
+        if s is not None:
+            t = s.shapes.title
+            self.footer(s)
+            return s, (t.top + t.height) / EMU_PER_IN + 0.25
         s = self.blank_slide()
         top = self.header(s, kicker, title)
         self.footer(s)
         return s, top
 
     def final_slide(self, title, subtitle):
+        s = self._layout_slide("final", title, subtitle)
+        if s is not None:
+            return s
         s = self.blank_slide("primary")
         w = self.W - 2 * self._m
         self.rect(s, 0, 0, 0.28, self.H, fill="highlight")
