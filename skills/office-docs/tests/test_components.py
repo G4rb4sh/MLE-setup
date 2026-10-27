@@ -183,3 +183,24 @@ def test_image_row_webp_message(make_brand, tmp_path):
     p.write_bytes(b"RIFF")
     with pytest.raises(ValueError, match=r"\.webp no soportado"):
         d.image_row(d.blank_slide(), 2, [{"path": p}])
+
+
+def _runs(slide, text):
+    return [r for sh in slide.shapes if sh.has_text_frame
+            for p in sh.text_frame.paragraphs for r in p.runs if r.text == text]
+
+
+def test_dark_split_image_lead_readable(make_brand, tmp_path):
+    d = _deck(make_brand, "dark")
+    s, top = d.content_slide("k", "t")
+    d.split_image(s, top, _png(tmp_path / "i.png", 30, 20), ["Uno: detalle"])
+    (lead,) = _runs(s, "Uno: ")
+    assert lead.font.color.rgb == d.color("on_primary") != d.color("primary")
+
+
+@pytest.mark.parametrize("style", ("modern", "outlined"))
+def test_section_caption_readable(make_brand, tmp_path, style):
+    d = _deck(make_brand, style)
+    s = d.section_slide("02", "Sección", image=_png(tmp_path / "i.png", 30, 20), caption="Epígrafe")
+    (cap,) = _runs(s, "Epígrafe")
+    assert cap.font.color.rgb == d.color("on_primary")

@@ -74,7 +74,7 @@ class Components:
         s = self.blank_slide("primary")
         tw = 7.4
         if image:
-            self.image(s, image, self.W - 4.83, 0.9, 4.2, 5.7, caption=caption)
+            self.image(s, image, self.W - 4.83, 0.9, 4.2, 5.7, caption=caption, caption_color=self._ink("primary"))
         else:
             self.text(s, self.W - 5.13, 0.95, 5.0, 5.6, number, size=320, font="heading", bold=True,
                       color=self._mix("primary", "on_primary", 0.12), align="right", anchor="middle")
@@ -316,7 +316,7 @@ class Components:
         tw = total - iw
         h = self._body_bottom - top
         tx, ix = (self._m, self._m + tw + gap) if side == "right" else (self._m + iw + gap, self._m)
-        self.bullets(s, tx, top, tw, h, items)
+        self.bullets(s, tx, top, tw, h, items, lead_color=self._ink(self.brand.components["content_bg"]))
         self.image(s, path, ix, top, iw, h, caption=caption, frame=True)
 
     # ── diagram pieces ──

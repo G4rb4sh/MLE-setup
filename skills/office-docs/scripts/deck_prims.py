@@ -118,8 +118,8 @@ class Primitives:
                 self._run(p, **{**base, **run})
         return sh
 
-    def bullets(self, s, x, y, w, h, items, size=15, marker_color="highlight", spread=True):
-        """Bulleted list. "Lead: rest" bolds the lead in primary; a leading "  " makes a sub-bullet.
+    def bullets(self, s, x, y, w, h, items, size=15, marker_color="highlight", spread=True, lead_color="primary"):
+        """Bulleted list. "Lead: rest" bolds the lead in `lead_color`; a leading "  " makes a sub-bullet.
         `spread` distributes the free height between items (capped at 3x the font size)."""
         sh = self._textbox(s, x, y, w, h, "top")
         tf = sh.text_frame
@@ -141,7 +141,7 @@ class Primitives:
                       "muted" if sub else marker_color, bold=True)
             if ": " in txt and not sub:
                 lead, rest = txt.split(": ", 1)
-                self._run(p, lead + ": ", size, "primary", bold=True)
+                self._run(p, lead + ": ", size, lead_color, bold=True)
                 self._run(p, rest, size, "text")
             else:
                 self._run(p, txt, size - (1 if sub else 0), "muted" if sub else "text")
@@ -162,9 +162,9 @@ class Primitives:
         return sh
 
     # ── images and effects ──
-    def image(self, s, path, x, y, w, h, fit="contain", caption=None, frame=False):
+    def image(self, s, path, x, y, w, h, fit="contain", caption=None, frame=False, caption_color="muted"):
         """Picture in the box (x, y, w, h). `fit`: contain (whole image, centered), cover (cropped to
-        fill), stretch. A caption takes the bottom 0.45 in of the box. GIFs stay animated."""
+        fill), stretch. A caption (in `caption_color`) takes the bottom 0.45 in of the box. GIFs stay animated."""
         path = Path(path)
         if path.suffix.lower() == ".webp":
             raise ValueError(f"{path}: .webp no soportado por python-pptx: convertir a PNG")
@@ -191,7 +191,7 @@ class Primitives:
             self.rect(s, left, top, width, height, fill=None, line="card_border", line_w=1.25)
         if caption:
             self.text(s, x, top + height + CAPTION_GAP, w, CAPTION_H - CAPTION_GAP, caption,
-                      size=11, color="muted", italic=True, align="center", line_spacing=1.0)
+                      size=11, color=caption_color, italic=True, align="center", line_spacing=1.0)
         return pic
 
     def icon(self, s, path, x, y, size=0.5):

@@ -113,6 +113,11 @@ def test_bullets_lead_and_sub(d):
     paras = sh.text_frame.paragraphs
     assert any(r.text == "Uno: " and r.font.bold for r in paras[0].runs)
     assert "sub" in paras[1].text
+    lead = next(r for r in paras[0].runs if r.text == "Uno: ")
+    assert lead.font.color.rgb == d.color("primary")
+    sh = d.bullets(s, 0, 0, 6, 3, ["Uno: detalle"], lead_color="accent")
+    lead = next(r for r in sh.text_frame.paragraphs[0].runs if r.text == "Uno: ")
+    assert lead.font.color.rgb == d.color("accent")
 
 
 def test_chip_autosize(d):
@@ -146,6 +151,16 @@ def test_image_contain_fit(d, tmp_path):
     assert pic.height == Inches(1)
     assert pic.top == Inches(1.5)
     assert pic.left == Inches(1)
+
+
+def test_image_caption_color(d, tmp_path):
+    s = d.blank_slide()
+    p = _png(tmp_path / "c.png", 20, 20)
+    d.image(s, p, 0, 0, 2, 2, caption="def")
+    d.image(s, p, 3, 0, 2, 2, caption="own", caption_color="on_primary")
+    runs = {sh.text_frame.text: sh.text_frame.paragraphs[0].runs[0] for sh in s.shapes if sh.has_text_frame}
+    assert runs["def"].font.color.rgb == d.color("muted")
+    assert runs["own"].font.color.rgb == d.color("on_primary")
 
 
 def test_icon_square_box(d, tmp_path):
