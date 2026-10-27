@@ -25,6 +25,23 @@ Makefiles, scripts, README):
   constraints (compliance, sensitive data, environments,
   deployment target). If it does not appear in the repo, ask the user.
 
+### Python projects: verify the runtime before setup
+- Require **Python >=3.11**. Check existing version constraints and dependencies,
+  then verify the candidate interpreter's actual path and version before creating
+  or reusing `.venv`. An installed system Python is not an automatic choice.
+- Select an explicit compatible interpreter through the available environment
+  manager (e.g. uv, pyenv, or the Windows Python launcher). Do not blindly run
+  `python -m venv` or `python3 -m venv`, or assume the same paths on Mac and Windows.
+- Use the environment's interpreter for package installation, tests, and the app.
+  In notebooks, select the kernel separately and verify `sys.version_info` and
+  `sys.executable` in a cell before running the workflow.
+- Record the minimum and selected version using existing project conventions
+  (e.g. `requires-python`, `.python-version`, environment config, README); do not
+  introduce a packaging framework solely to record the version.
+- For an existing environment below 3.11, explain the mismatch before replacing
+  it; stop its kernels/app first. For incompatible legacy requirements, ask for
+  an explicit exception or migration. Do not remove OS/developer-tool Python.
+
 ## 2. Create AGENTS.md at the root
 Maximum ~80 lines, actionable. Sections:
 1. What this project is and which client it is for (2-3 lines).

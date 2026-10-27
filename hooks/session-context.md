@@ -18,6 +18,18 @@ over these if they conflict.
   and offer the `repo-bootstrap` skill before major changes.
 - If the repo DOES have them, its rules override these preferences.
 
+## Python environments
+- Use **Python >=3.11** for projects, scripts, and notebooks. Before creating or
+  reusing an environment, verify the actual interpreter path and version; never
+  choose an older system Python just because `python` or `python3` resolves to it.
+- Use the project's virtual environment for installs, tests, and app execution.
+  Select and verify notebook kernels separately; activating a terminal or changing
+  the editor interpreter does not switch an existing kernel.
+- Record the minimum and chosen version in the project's existing configuration
+  and setup docs. Do not copy machine-specific absolute paths between computers.
+- If a legacy repo requires Python <3.11, explain the conflict and ask before an
+  exception or migration. Never uninstall OS/developer-tool Python to fix selection.
+
 ## Simplicity core (active in every code response)
 The best code is the code that is never written. Before writing, stop at the first
 rung that holds: (1) does it need to exist? (YAGNI) (2) does it already exist in this
@@ -56,9 +68,13 @@ codebase? reuse it (3) does the stdlib do it? (4) does the native platform do it
   that proves it IN THAT MESSAGE and read its output.
 
 ## Living setup
+- For setup edits, missing skills, portable preferences, or "mejorar el setup",
+  load `setup-gardener` first: it maps source files, discovery, and verification.
 - When the user corrects you, when a setup command or instruction proves
-  wrong, or when time is lost due to missing context: propose, in the moment,
-  the one-line rule that would have prevented it and, with approval, apply it.
+  wrong, or when time is lost due to missing context: state the smallest useful
+  correction. Apply local reversible changes covered by the user's request or
+  standing authorization; otherwise propose them first. Preserve git and safety
+  boundaries; improving the setup is not permission to relax tool approvals.
 - If it is not the right moment, record the lesson in `~/.mle-setup/lessons.md`
   (format: `YYYY-MM-DD | repo | what happened | candidate rule`). The
   `setup-gardener` skill digests it.

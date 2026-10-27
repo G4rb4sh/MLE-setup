@@ -8,6 +8,10 @@ description: >
 
 When writing or reviewing ML code, verify:
 
+0. Python **>=3.11**, with the minimum requirement and selected runtime version
+   recorded in project config/docs. Verify the actual interpreter and notebook
+   kernel, not just the terminal's `PATH`; install and run through that environment.
+   If legacy dependencies require an older Python, ask before making an exception.
 1. Seeds fixed and logged (framework, numpy, dataloaders).
 2. Experiment configuration versioned in files, not
    hardcoded or only in notebooks.
