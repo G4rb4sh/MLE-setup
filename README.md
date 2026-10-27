@@ -12,7 +12,7 @@ Claude Code). It complements two upstream plugins instead of copying them:
 ## Contents
 - **Skills**: repo-bootstrap, pr-review, ml-repro, eda, llm-eval,
   prod-incident, scoping, status-update, pre-delivery-audit, handoff, kb,
-  setup-gardener.
+  office-docs, setup-gardener.
 - **Agents**: code-reviewer, researcher, test-runner.
 - **SessionStart hook**: injects [session-context.md](hooks/session-context.md)
   (production safety, ML ladder, Python >=3.11, evidence, language).

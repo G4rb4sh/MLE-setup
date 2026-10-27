@@ -26,3 +26,5 @@ the language the client uses (ask if it is not obvious). Sections:
 Verify every claim against the code; mark anything you cannot verify with
 [CONFIRM] and list it at the end for the user.
 Suggest running pre-delivery-audit if it was not done.
+
+Para pasarlo a ppt o Word con la marca del cliente, usar la skill office-docs.

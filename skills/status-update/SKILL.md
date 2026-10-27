@@ -21,3 +21,5 @@ description: >
    - New risks, only if they are real.
 4. Show the draft for editing before sending. Never invent
    progress or dates: everything comes from the repo or the user.
+
+Para pasarlo a ppt o Word con la marca del cliente, usar la skill office-docs.

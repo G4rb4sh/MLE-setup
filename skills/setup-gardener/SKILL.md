@@ -29,6 +29,7 @@ friction; one preference is not a framework.
 | Always-on rule (keep it under ~40 lines) | `MLE-setup/hooks/session-context.md` |
 | Hook wiring | `hooks/copilot-hooks.json` (Copilot) and `hooks/claude-hooks.json` (Claude Code); never `hooks/hooks.json` |
 | Consulting/ML workflow or trigger | `MLE-setup/skills/<name>/SKILL.md` |
+| office-docs brands (colors, fonts, logos, templates) | Public generic: `MLE-setup/skills/office-docs/brands/neutral`; real/client brands: `MLE-setup-personal/brands` (linked as `~/.mle-setup/brands`); extra folders via `MLE_BRANDS_PATH` |
 | Subagent behavior | `MLE-setup/agents/` |
 | Workflow/simplicity skills | Upstream `superpowers` / `ponytail` plugins: update with `copilot plugin update <name>` or Claude Code `/plugin`; override behavior from this plugin, never by editing their install |
 | Private preferences, machine map, authorization | `MLE-setup-personal/skills/` |
