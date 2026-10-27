@@ -13,7 +13,7 @@ to regenerate FILE.
 
 PDF backend, in order: macOS PowerPoint (.pptx) / Word (.docx) via osascript, then
 `soffice --headless`. Office always works on a temporary copy and closes only that copy
-(matched by its full path), so documents the user has open are never touched.
+(addressed by its unique file name), so documents the user has open are never touched.
 """
 
 from __future__ import annotations
@@ -42,43 +42,50 @@ _TERMS = {
     "Microsoft Word": ("document", "save as $doc file name pdfPath file format format PDF"),
 }
 
-# Finds the temp copy by comparing `full name` client-side (Word's `whose` filter ignores the
-# test). PowerPoint reports a POSIX full name without the /private prefix, Word an HFS one
-# with it; all these forms are accepted.
+# Every save/close names the copy by its unique file name (`$noun nm`), so the app resolves the
+# target inside the same Apple event that acts on it; a missing name errors (-1728) instead of
+# hitting another document. Never address documents by index or with `whose` (Word ignores it).
 _OSASCRIPT = Template("""\
-on findDoc(names)
-  tell application "$app"
-    repeat with i from 1 to count of ${noun}s
-      set fn to full name of $noun i
-      if names contains {fn} then return i
-    end repeat
-  end tell
-  return 0
-end findDoc
-
 set src to $src
+set nm to $name
 set pdfPath to $pdf
-set names to {src, $alt, (POSIX file src) as text}
 with timeout of $timeout seconds
   tell application "$app"
     activate -- a backgrounded (App Nap) app can stall `open` for minutes
     open POSIX file src
-    set idx to 0
+    set opened to false
     repeat 240 times
-      set idx to my findDoc(names)
-      if idx > 0 then exit repeat
+      if exists $noun nm then
+        set opened to true
+        exit repeat
+      end if
       delay 0.25
     end repeat
-    if idx = 0 then error "the temporary copy did not open in $app" number 9001
+    if not opened then
+      try
+        close $noun nm saving no
+      end try
+      error "the temporary copy did not open in $app within 60 s; it may still appear there later (close it without saving)" number 9001
+    end if
     set failure to missing value
     try
       $save
     on error m number n
       set failure to {m, n}
     end try
-    set idx to my findDoc(names)
-    if idx > 0 then close $noun idx saving no
+    close $noun nm saving no
     if failure is not missing value then error (item 1 of failure) number (item 2 of failure)
+  end tell
+end timeout
+""")
+
+# Best-effort cleanup after osascript itself timed out: close the copy only if it is there.
+_CLEANUP = Template("""\
+with timeout of 30 seconds
+  tell application "$app"
+    try
+      close $noun $name saving no
+    end try
   end tell
 end timeout
 """)
@@ -108,21 +115,28 @@ def office_app(suffix: str) -> str | None:
     return app if Path(f"/Applications/{app}.app").exists() else None
 
 
+def _office_script(app: str, copy: Path, out: Path) -> str:
+    noun, save = _TERMS[app]
+    return _OSASCRIPT.substitute(
+        app=app, noun=noun, save=Template(save).substitute(doc=f"{noun} nm"),
+        src=applescript_quote(copy), name=applescript_quote(Path(copy.name)),
+        pdf=applescript_quote(out), timeout=EXPORT_TIMEOUT_S,
+    )
+
+
 def _export_office(app: str, src: Path, pdf: Path) -> Path:
     with tempfile.TemporaryDirectory(prefix="office-docs-render-") as td:
-        tmp = Path(td).resolve()
-        copy = tmp / f"office-docs-{uuid.uuid4().hex[:8]}{src.suffix.lower()}"
+        copy = Path(td) / f"office-docs-{uuid.uuid4().hex[:8]}{src.suffix.lower()}"
         shutil.copyfile(src, copy)
         out = copy.with_suffix(".pdf")
-        alt = Path(str(copy).removeprefix("/private")) if str(copy).startswith("/private/") else copy
-        noun, save = _TERMS[app]
-        script = _OSASCRIPT.substitute(
-            app=app, noun=noun, save=Template(save).substitute(doc=f"{noun} idx"),
-            src=applescript_quote(copy), alt=applescript_quote(alt), pdf=applescript_quote(out),
-            timeout=EXPORT_TIMEOUT_S,
-        )
-        r = subprocess.run(["osascript", "-"], input=script, capture_output=True, text=True,
-                           timeout=EXPORT_TIMEOUT_S + 30)
+        try:
+            r = subprocess.run(["osascript", "-"], input=_office_script(app, copy, out),
+                               capture_output=True, text=True, timeout=EXPORT_TIMEOUT_S + 30)
+        except subprocess.TimeoutExpired:
+            name = applescript_quote(Path(copy.name))
+            cleanup = _CLEANUP.substitute(app=app, noun=_TERMS[app][0], name=name)
+            subprocess.run(["osascript", "-"], input=cleanup, capture_output=True, text=True, timeout=60)
+            raise
         if r.returncode != 0:
             err = r.stderr.strip()
             if NOT_AUTHORIZED in err:
@@ -219,7 +233,7 @@ def main(argv: list[str] | None = None) -> int:
     except subprocess.CalledProcessError as e:
         print(f"build failed: {e}", file=sys.stderr)
         return e.returncode or 1
-    except (RuntimeError, FileNotFoundError) as e:  # includes RenderUnavailable
+    except (RuntimeError, FileNotFoundError, subprocess.TimeoutExpired) as e:  # + RenderUnavailable
         print(f"render failed: {e}", file=sys.stderr)
         return 2
     print(res.pdf)

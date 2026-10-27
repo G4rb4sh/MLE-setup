@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -138,3 +139,26 @@ def test_not_authorized(monkeypatch, tmp_path):
     src.write_bytes(b"")
     with pytest.raises(RenderUnavailable, match="Privacy & Security → Automation"):
         export_pdf(src, tmp_path / "deck.pdf")
+
+
+@pytest.mark.parametrize("app,noun", [("Microsoft PowerPoint", "presentation"),
+                                      ("Microsoft Word", "document")])
+def test_script_targets_copy_by_name(app, noun):
+    copy = Path('/var/x/Carpeta "q" — ñ/office-docs-0a1b2c3d.pptx')
+    script = render._office_script(app, copy, copy.with_suffix(".pdf"))
+    assert f"set nm to {applescript_quote(Path(copy.name))}" in script
+    acts = [ln.strip() for ln in script.splitlines()
+            if re.match(r"\s*(close|save)\b", ln)]
+    assert len(acts) == 3  # save, close, best-effort close on the late-open path
+    assert all(f"{noun} nm" in ln for ln in acts)
+    assert not re.search(rf"{noun} (idx|i|\d+)\b", script)
+    assert "may still appear" in script
+
+
+def test_main_timeout_exits_2(monkeypatch, tmp_path, capsys):
+    def slow(*a, **kw):
+        raise subprocess.TimeoutExpired(["osascript", "-"], 630)
+
+    monkeypatch.setattr(render, "render", slow)
+    assert render.main([str(tmp_path / "deck.pptx")]) == 2
+    assert "render failed" in capsys.readouterr().err
