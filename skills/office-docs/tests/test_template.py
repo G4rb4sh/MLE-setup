@@ -147,3 +147,47 @@ def test_layouts_ignored_without_template(make_brand):
     d = Deck(folder)
     assert d.layout("title") is None
     assert d.title_slide("k", "T", "s").slide_layout.name == "Blank"
+
+
+def _as_body(layout, top=None, height=None):
+    """Turn the layout's OBJECT placeholder (idx 1) into a BODY one, optionally moved/resized (inches)."""
+    ph = next(p for p in layout.placeholders if p.placeholder_format.idx == 1)
+    ph._element.ph.set("type", "body")
+    if top is not None:
+        ph.top, ph.height = int(top * 914400), int(height * 914400)
+    return ph
+
+
+def test_template_blank_slide_inherits_background(template_brand):
+    d = Deck(template_brand('title = "Title Slide"'))
+    assert d.blank_slide()._element.cSld.bg is None
+    assert d.content_slide("k", "Dibujada")[0]._element.cSld.bg is None
+    assert d.blank_slide(bg="primary")._element.cSld.bg is not None
+    assert d.final_slide("Gracias", "")._element.cSld.bg is not None
+
+
+def test_mapped_content_slide_has_no_drawn_footer(template_brand):
+    d = Deck(template_brand())
+    s, _ = d.content_slide("k", "T")
+    assert [sh.is_placeholder for sh in s.shapes] == [True]
+    texts = [sh.text_frame.text for sh in s.shapes if sh.has_text_frame]
+    assert "Lab X" not in texts and "01" not in texts
+
+
+def test_kicker_not_written_into_large_body(template_brand):
+    d = Deck(template_brand('content = "Title and Content"'))
+    _as_body(next(l for l in d.prs.slide_layouts if l.name == "Title and Content"))
+    s, top = d.content_slide("k", "T")
+    assert [ph.placeholder_format.idx for ph in s.placeholders] == [0]
+    assert "k" not in [sh.text_frame.text for sh in s.shapes if sh.has_text_frame]
+    t = s.shapes.title
+    assert top == pytest.approx((t.top + t.height) / 914400 + 0.25)
+
+
+def test_kicker_in_small_body_above_title(template_brand):
+    d = Deck(template_brand('content = "Title and Content"'))
+    layout = next(l for l in d.prs.slide_layouts if l.name == "Title and Content")
+    title_top = layout.placeholders[0].top / 914400
+    _as_body(layout, top=title_top - 0.5, height=0.4)
+    s, _ = d.content_slide("k", "T")
+    assert [ph.text_frame.text for ph in s.placeholders] == ["T", "k"]

@@ -17,6 +17,7 @@ from deck_prims import CAPTION_H, EMU_PER_IN, est_lines
 
 NODE_STATES = ("done", "planned")
 TITLE_PLACEHOLDERS = (PP_PLACEHOLDER.TITLE, PP_PLACEHOLDER.CENTER_TITLE)
+KICKER_MAX_H = 1.0  # inches: tallest body placeholder taken as a kicker slot on content slides
 
 
 def _gap(pt: float) -> list[dict]:
@@ -30,6 +31,11 @@ def _aspect(path) -> float:
         raise ValueError(f"{path}: .webp no soportado por python-pptx: convertir a PNG")
     w, h = PptxImage.from_file(str(path)).size
     return w / h
+
+
+def _in_header(ph, title) -> bool:
+    """Small placeholder (<= KICKER_MAX_H) whose bottom is not below the title's: above or beside it."""
+    return ph.height <= KICKER_MAX_H * EMU_PER_IN and ph.top + ph.height <= title.top + title.height
 
 
 class Components:
@@ -58,11 +64,13 @@ class Components:
         return "primary" if (b + 0.05) / (a + 0.05) >= 3 else "on_primary"
 
     # ── slide factories ──
-    def _layout_slide(self, role, title, *texts):
+    def _layout_slide(self, role, title, *texts, header_only=False):
         """Slide on the template layout mapped to `role` (None if unmapped).
 
         The title goes into the title placeholder (named "title"); each non-empty text in `texts`
-        fills the next subtitle placeholder, then body placeholders top to bottom. Placeholders
+        fills the next subtitle placeholder, then body placeholders top to bottom. With
+        `header_only` (the caller draws below the title) a body placeholder only takes text if it
+        is small and not lower than the title; texts without a slot are dropped. Placeholders
         left empty are removed so the slide shows no "Click to add" prompts.
         """
         layout = self.layout(role)
@@ -77,7 +85,8 @@ class Components:
         t.name = "title"
         t.text_frame.text = title
         slots = sorted(
-            (ph for ph in phs if ph.placeholder_format.type in (PP_PLACEHOLDER.SUBTITLE, PP_PLACEHOLDER.BODY)),
+            (ph for ph in phs if ph.placeholder_format.type == PP_PLACEHOLDER.SUBTITLE
+             or ph.placeholder_format.type == PP_PLACEHOLDER.BODY and (not header_only or _in_header(ph, t))),
             key=lambda ph: (ph.placeholder_format.type != PP_PLACEHOLDER.SUBTITLE, ph.top),
         )
         for ph, text in zip(slots, [x for x in texts if x]):
@@ -124,12 +133,10 @@ class Components:
         return s
 
     def content_slide(self, kicker, title):
-        """Slide with header and footer; returns (slide, top of the body in inches)."""
-        s = self._layout_slide("content", title, kicker)
-        if s is not None:
-            t = s.shapes.title
-            self.footer(s)
-            return s, (t.top + t.height) / EMU_PER_IN + 0.25
+        """Slide with header and footer (template layout: the master's); returns (slide, body top in inches)."""
+        s = self._layout_slide("content", title, kicker, header_only=True)
+        if s is not None:  # footer and page number come from the template master, not drawn
+            return s, max(ph.top + ph.height for ph in s.placeholders) / EMU_PER_IN + 0.25
         s = self.blank_slide()
         top = self.header(s, kicker, title)
         self.footer(s)

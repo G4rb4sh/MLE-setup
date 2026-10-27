@@ -105,13 +105,15 @@ class Deck(Primitives, Components):
     def blank_slide(self, bg: str | None = None) -> Slide:
         """New empty slide; `bg=None` uses components.content_bg.
 
-        With a template: its "Blank" layout (else the one with fewest placeholders), placeholders removed.
+        With a template: its "Blank" layout (else the one with fewest placeholders), placeholders
+        removed, and `bg=None` leaves the background unset so the master's fill shows through.
         """
         s = self.prs.slides.add_slide(self._blank_layout())
         for ph in list(s.placeholders):
             ph._element.getparent().remove(ph._element)
-        s.background.fill.solid()
-        s.background.fill.fore_color.rgb = self.color(bg or self.brand.components["content_bg"])
+        if bg or self.brand.template is None:
+            s.background.fill.solid()
+            s.background.fill.fore_color.rgb = self.color(bg or self.brand.components["content_bg"])
         self.page += 1
         return s
 
