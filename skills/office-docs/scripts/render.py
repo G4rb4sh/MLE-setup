@@ -48,7 +48,7 @@ _TERMS = {
 _OSASCRIPT = Template("""\
 set src to $src
 set nm to $name
-set pdfPath to $pdf
+$setup
 with timeout of $timeout seconds
   tell application "$app"
     activate -- a backgrounded (App Nap) app can stall `open` for minutes
@@ -69,7 +69,7 @@ with timeout of $timeout seconds
     end if
     set failure to missing value
     try
-      $save
+      $action
     on error m number n
       set failure to {m, n}
     end try
@@ -115,36 +115,63 @@ def office_app(suffix: str) -> str | None:
     return app if Path(f"/Applications/{app}.app").exists() else None
 
 
-def _office_script(app: str, copy: Path, out: Path) -> str:
-    noun, save = _TERMS[app]
+def temp_copy_name(suffix: str) -> str:
+    """A file name no user document has, so Office can address the copy by name alone."""
+    return f"office-docs-{uuid.uuid4().hex[:8]}{suffix.lower()}"
+
+
+def office_script(app: str, copy: Path, action: str, setup: str = "",
+                  timeout: int = EXPORT_TIMEOUT_S) -> str:
+    """AppleScript that opens `copy`, runs `action` on it and closes it without saving.
+
+    In `action`, `$doc` is the copy addressed by name (e.g. `document nm`); `setup` runs
+    before the `tell` block. The copy is closed even when `action` fails, then the error
+    is re-raised.
+    """
+    noun = _TERMS[app][0]
     return _OSASCRIPT.substitute(
-        app=app, noun=noun, save=Template(save).substitute(doc=f"{noun} nm"),
-        src=applescript_quote(copy), name=applescript_quote(Path(copy.name)),
-        pdf=applescript_quote(out), timeout=EXPORT_TIMEOUT_S,
+        app=app, noun=noun, action=Template(action).substitute(doc=f"{noun} nm"), setup=setup,
+        src=applescript_quote(copy), name=applescript_quote(Path(copy.name)), timeout=timeout,
     )
+
+
+def run_office_script(app: str, copy: Path, script: str,
+                      timeout: int = EXPORT_TIMEOUT_S) -> subprocess.CompletedProcess:
+    """Run `script` with osascript (stdin). On timeout, close `copy` by name (best effort), re-raise."""
+    try:
+        return subprocess.run(["osascript", "-"], input=script, capture_output=True, text=True,
+                              timeout=timeout + 30)
+    except subprocess.TimeoutExpired:
+        cleanup = _CLEANUP.substitute(app=app, noun=_TERMS[app][0],
+                                      name=applescript_quote(Path(copy.name)))
+        subprocess.run(["osascript", "-"], input=cleanup, capture_output=True, text=True, timeout=60)
+        raise
+
+
+def permission_hint(app: str, err: str) -> str | None:
+    """The fix for a -1743 (Automation not allowed) error, else None."""
+    if NOT_AUTHORIZED not in err:
+        return None
+    return (f"Not allowed to control {app} ({err}). Grant Automation permission in "
+            f"System Settings → Privacy & Security → Automation (let your terminal "
+            f"control {app}), then retry.")
+
+
+def _office_script(app: str, copy: Path, out: Path) -> str:
+    return office_script(app, copy, _TERMS[app][1], setup=f"set pdfPath to {applescript_quote(out)}")
 
 
 def _export_office(app: str, src: Path, pdf: Path) -> Path:
     with tempfile.TemporaryDirectory(prefix="office-docs-render-") as td:
-        copy = Path(td) / f"office-docs-{uuid.uuid4().hex[:8]}{src.suffix.lower()}"
+        copy = Path(td) / temp_copy_name(src.suffix)
         shutil.copyfile(src, copy)
         out = copy.with_suffix(".pdf")
-        try:
-            r = subprocess.run(["osascript", "-"], input=_office_script(app, copy, out),
-                               capture_output=True, text=True, timeout=EXPORT_TIMEOUT_S + 30)
-        except subprocess.TimeoutExpired:
-            name = applescript_quote(Path(copy.name))
-            cleanup = _CLEANUP.substitute(app=app, noun=_TERMS[app][0], name=name)
-            subprocess.run(["osascript", "-"], input=cleanup, capture_output=True, text=True, timeout=60)
-            raise
+        r = run_office_script(app, copy, _office_script(app, copy, out))
         if r.returncode != 0:
             err = r.stderr.strip()
-            if NOT_AUTHORIZED in err:
-                raise RenderUnavailable(
-                    f"Not allowed to control {app} ({err}). Grant Automation permission in "
-                    f"System Settings → Privacy & Security → Automation (let your terminal "
-                    f"control {app}), then retry."
-                )
+            hint = permission_hint(app, err)
+            if hint:
+                raise RenderUnavailable(hint)
             raise RuntimeError(f"{app} could not export {src.name} to PDF: {err}")
         if not out.exists():
             raise RuntimeError(f"{app} reported success but wrote no PDF for {src.name}")
