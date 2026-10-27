@@ -1,10 +1,16 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["python-pptx"]
+# ///
 """Deck: an editable .pptx built from a brand folder.
 
     d = Deck("neutral")
     s = d.blank_slide()
     x, w = d.col(0, 6)  # first half of the grid
     d.text(s, x, 1.0, w, 0.8, "Hola", size=28, font="heading")
-    d.save("out.pptx")
+    d.save("out.pptx")  # also prints layout-check warnings to stderr
+
+CLI: `uv run deck.py check FILE` prints the advisory layout issues of a .pptx (or OK); exit code 0.
 
 Public units are inches (floats); colors are a brand token ("accent") or a hex.
 With `[deck] template` the deck starts from that .pptx (its slides removed) and the slide
@@ -13,6 +19,8 @@ factories use the layouts mapped in `[deck.layouts]`.
 
 from __future__ import annotations
 
+import argparse
+import sys
 from pathlib import Path
 
 from pptx import Presentation
@@ -21,6 +29,7 @@ from pptx.slide import Slide, SlideLayout
 from pptx.util import Emu
 
 from brand import COLOR_TOKENS, Brand, BrandError, load_brand, normalize_hex
+from deck_check import check_file, check_presentation
 from deck_components import Components
 from deck_prims import EMU_PER_IN, Primitives
 
@@ -122,5 +131,32 @@ class Deck(Primitives, Components):
         return slide
 
     def save(self, path: str | Path) -> int:
+        """Write the .pptx, print advisory layout issues to stderr, return the slide count."""
         self.prs.save(str(path))
+        try:
+            for issue in check_presentation(self.prs):
+                print(f"layout check: {issue}", file=sys.stderr)
+        except Exception as e:  # the check is advisory: never fail a build because of it
+            print(f"layout check skipped: {type(e).__name__}: {e}", file=sys.stderr)
         return len(self.prs.slides)
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(prog="deck.py", description="Deck tools.")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("check", help="advisory layout check of a .pptx (always exits 0)").add_argument("file")
+    args = ap.parse_args(argv)
+    try:
+        issues = check_file(args.file)
+    except Exception as e:  # advisory tool: report and exit 0
+        print(f"layout check skipped: {type(e).__name__}: {e}", file=sys.stderr)
+        return 0
+    for issue in issues:
+        print(issue)
+    if not issues:
+        print("OK")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
