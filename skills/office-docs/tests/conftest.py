@@ -1,4 +1,5 @@
 import sys
+import warnings
 from collections.abc import Callable
 from pathlib import Path
 
@@ -6,6 +7,14 @@ import pytest
 
 SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS))
+
+# PyMuPDF's SWIG bindings warn on import (and again at interpreter exit) under Python 3.12+.
+SWIG_WARNING = r"builtin type (SwigPyPacked|SwigPyObject|swigvarlink) has no __module__ attribute"
+warnings.filterwarnings("ignore", message=SWIG_WARNING, category=DeprecationWarning)
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line("filterwarnings", f"ignore:{SWIG_WARNING}:DeprecationWarning")
 
 
 @pytest.fixture
