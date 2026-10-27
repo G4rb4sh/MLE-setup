@@ -1,27 +1,37 @@
 ---
 name: pr-review
 description: >
-  Review of a diff, branch, or PR before merging. Use when the
-  user asks "review this", "PR review", "is this ready to merge?",
-  or before opening a PR.
+  Correctness review of a diff, branch, or PR before merging. Use when the user
+  says "revisá esto", "revisame el PR", "¿está listo para mergear?", "review",
+  or before opening a PR. Not for over-engineering/complexity (ponytail-review)
+  or a whole-repo delivery check (pre-delivery-audit).
 ---
 
-Review the change against this checklist. Report concrete findings with
-file and line; one line per finding, ordered by severity.
+## 1. Pin the scope
+- Get the fixed point (base branch, commit, or PR). If not given, ask.
+- Run `git diff <base>...HEAD` and `git log <base>..HEAD --oneline`. Stop if the
+  ref does not resolve or the diff is empty.
+- Find the spec: issue referenced in commits, a path the user gave, or a doc in
+  `docs/`/`specs/`. If none exists, say so and skip the Spec axis.
 
-1. Correctness: logic, edge cases, error handling, race conditions
-   if applicable.
-2. Tests: is the change covered? Do the tests verify behavior,
-   not implementation?
-3. Consistency: does it follow the repo AGENTS.md conventions and the
-   patterns already present in the codebase?
-4. Basic security: no hardcoded secrets, external inputs validated,
-   no client data in logs.
-5. Contract: are changes to APIs, schemas, or public interfaces
-   flagged as breaking when appropriate?
+## 2. Review on separate axes (do not merge or rerank them)
+**Spec**: requirements missing or partial; behavior not asked for (scope creep);
+requirements implemented wrongly. Quote the spec line for each.
 
-Out of scope: complexity and over-engineering (run the ponytail-review skill
-in parallel; always suggest it for large diffs).
+**Correctness**: logic, edge cases, error handling, concurrency if relevant.
+Are the changes covered by tests that verify behavior, not implementation?
 
-Close: clear verdict (ready to merge / needs changes) with blockers
-listed separately from optional suggestions.
+**Standards**: repo `AGENTS.md`/`CONTRIBUTING.md` and existing patterns. A
+documented repo rule always wins; skip what linters already enforce.
+
+**Safety and contract**: no secrets or client data in code/logs/fixtures,
+external inputs validated, breaking changes to APIs/schemas flagged.
+
+**ML (when applicable)**: data leakage between splits, seeds/config/data
+version traceable (see `ml-repro`), metrics compared against a baseline,
+`ml-over:` when a lower rung of the ML ladder would suffice.
+
+## 3. Report
+One line per finding, `file:line — problem — fix`, ordered by severity, grouped
+by axis. Close with a verdict (ready to merge / needs changes), blockers listed
+separately from suggestions. For large diffs, suggest running `ponytail-review`.

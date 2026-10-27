@@ -1,17 +1,17 @@
 ---
 name: ml-repro
 description: >
-  Reproducibility checklist for ML code. Use when writing or
-  reviewing training, evaluation, or data pipeline code, or when
-  the user mentions experiments, models, or datasets.
+  Reproducibility checklist for ML code. Use when writing or reviewing
+  training, evaluation, feature, or data pipeline code, notebooks, or
+  experiments ("entrenar", "experimento", "notebook", "pipeline de datos",
+  "¿es reproducible?"). Not for exploring a new dataset (eda) or evaluating
+  LLM features (llm-eval).
 ---
 
 When writing or reviewing ML code, verify:
 
-0. Python **>=3.11**, with the minimum requirement and selected runtime version
-   recorded in project config/docs. Verify the actual interpreter and notebook
-   kernel, not just the terminal's `PATH`; install and run through that environment.
-   If legacy dependencies require an older Python, ask before making an exception.
+0. Python >=3.11, recorded in project config; the actual interpreter and notebook
+   kernel verified (details in `repo-bootstrap`).
 1. Seeds fixed and logged (framework, numpy, dataloaders).
 2. Experiment configuration versioned in files, not
    hardcoded or only in notebooks.

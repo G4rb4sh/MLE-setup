@@ -1,11 +1,10 @@
 ---
 name: prod-incident
 description: >
-  Handling a production incident: something is down, degraded, or
-  returning incorrect results in a real environment. Use when the
-  user says "it went down", "it is failing in prod", "the client reports
-  errors", or similar. DO NOT use for development bugs (that is the
-  systematic-debugging skill).
+  Handle a production incident: something is down, degraded, or returning
+  wrong results in a real environment. Use when the user says "se cayó",
+  "falla en prod", "el cliente reporta errores", "está lento en producción".
+  Mitigate first. Not for development bugs (systematic-debugging).
 ---
 
 Strict order: stabilize first, diagnose later. Do not
@@ -35,3 +34,4 @@ propose refactors or root cause while the system is degraded.
 - Brief postmortem in docs/incidents/YYYY-MM-DD-<slug>.md: timeline,
   impact, root cause, what would have prevented it, actions with
   owner. Blameless: system causes, not people.
+- If the cause is likely to recur, record it with the `kb` skill.

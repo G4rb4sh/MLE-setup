@@ -1,9 +1,10 @@
 ---
 name: eda
 description: >
-  Standardized initial exploration of a new dataset. Use when the
-  user says "explore this dataset", "EDA", "what is in this data",
-  or when starting an ML project with data the team does not know yet.
+  Standardized first exploration of an unfamiliar dataset. Use when the user
+  says "explorá este dataset", "EDA", "¿qué hay en estos datos?", "mirá este
+  CSV/tabla", or at the start of an ML project with new data. Not for
+  monitoring production data or debugging a pipeline.
 ---
 
 Generate a reproducible exploratory analysis (script or notebook according to

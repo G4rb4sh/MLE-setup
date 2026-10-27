@@ -1,9 +1,10 @@
 ---
 name: handoff
 description: >
-  Generates delivery documentation for handing a consulting project over
-  to the client. Use when the user says "handoff", "delivery documentation",
-  "close the project", or "prepare the transfer".
+  Generate docs/HANDOFF.md to hand a consulting project over to the client.
+  Use when the user says "handoff", "documentación de entrega", "cerramos el
+  proyecto", "preparar la transferencia". Not for a periodic status update
+  (status-update).
 ---
 
 Generate `docs/HANDOFF.md` (or update it) by reading the real repo. Everything in

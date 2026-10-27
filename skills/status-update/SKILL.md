@@ -1,9 +1,10 @@
 ---
 name: status-update
 description: >
-  Generates the periodic progress update for a client from the
-  repo's real state. Use when the user says "status update",
-  "summary for the client", "what did we advance this week", or similar.
+  Draft the periodic progress update for a client from the repo's real
+  state. Use when the user says "status update", "resumen para el cliente",
+  "¿qué avanzamos esta semana?", "armá el reporte semanal". Not for internal
+  handoff docs (handoff).
 ---
 
 1. Gather evidence: git log for the period (ask for the range if

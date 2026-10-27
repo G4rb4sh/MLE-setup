@@ -1,10 +1,11 @@
 ---
 name: llm-eval
 description: >
-  Design or improve evaluation for an LLM-based feature (RAG,
-  agents, classification, extraction, chat). Use when the user
-  mentions evals, prompt or model changes, quality regressions,
-  or before delivering a GenAI feature to a client.
+  Design or improve evaluation for an LLM feature (RAG, agents,
+  classification, extraction, chat). Use when the user mentions evals, changes
+  a prompt, model, or retrieval, reports quality regressions ("está
+  respondiendo peor", "cambié el prompt", "¿qué modelo uso?", "armá un eval"),
+  or before delivering a GenAI feature. Not for classic ML metrics (ml-repro).
 ---
 
 Objective: no prompt, model, or retrieval change reaches the

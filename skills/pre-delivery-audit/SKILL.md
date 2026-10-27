@@ -1,9 +1,9 @@
 ---
 name: pre-delivery-audit
 description: >
-  Final audit before delivering code or a system to a client.
-  Use when the user says "let's deliver", "delivery audit",
-  "is this ready for the client?", or before a handoff.
+  Final audit before delivering code or a system to a client. Use when the
+  user says "vamos a entregar", "auditoría de entrega", "¿está listo para el
+  cliente?", or before a handoff. Not for reviewing a single PR (pr-review).
 ---
 
 Review the full repo and report by section, with file:line

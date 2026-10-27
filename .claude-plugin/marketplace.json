@@ -5,13 +5,13 @@
     "name": "G4rb4sh"
   },
   "metadata": {
-    "description": "Unique, self-contained plugin: workflow, simplicity, and ML consulting skills.",
+    "description": "ML consulting skills, agents, and always-on safety rules.",
     "version": "0.1.0"
   },
   "plugins": [
     {
       "name": "mle-setup",
-      "description": "Agent setup for B2B ML consulting (workflow + simplicity + consulting).",
+      "description": "Agent setup for B2B ML consulting (complements superpowers + ponytail).",
       "version": "0.1.0",
       "source": "./"
     }

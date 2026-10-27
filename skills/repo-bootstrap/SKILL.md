@@ -1,10 +1,10 @@
 ---
 name: repo-bootstrap
 description: >
-  Configures a repository that does not have agent setup. Use when the
-  repo has no AGENTS.md or CLAUDE.md of its own, when the user says
-  "bootstrap", "configure this repo", or "repo setup", or when starting
-  work on a new client project.
+  Set up a repository for agent work when it has no AGENTS.md or CLAUDE.md,
+  or when starting a new client project. Use when the user says "bootstrap",
+  "configurá este repo", "armá el AGENTS.md", "arrancamos un proyecto nuevo".
+  Not for repos that already have AGENTS.md (edit that file directly).
 ---
 
 Objective: leave the repo with a single source of truth (`AGENTS.md`) and the
@@ -50,6 +50,8 @@ Maximum ~80 lines, actionable. Sections:
 4. Conventions: positive rules ("prefer X over Y").
 5. Forbidden areas: what not to touch without confirmation.
 6. Client context: constraints, environments, sensitive data.
+7. One line: "Solved problems: `docs/solutions/` (grep before debugging or
+   planning)." (see the `kb` skill).
 
 ## 3. Link tools
 - `CLAUDE.md` -> symlink to `AGENTS.md` (if not possible, one-line file:
@@ -63,11 +65,9 @@ Only what has real evidence in the repo:
 - `.claude/skills/ml-experiment/SKILL.md`: only if there is an ML component.
   Repo experiment conventions: where scripts and configs live,
   how runs are tracked.
-Do not duplicate what already exists at plugin level: workflow skills
-(brainstorming, writing-plans, tdd, debug, verify), simplicity skills
-(ponytail and variants), consulting skills (pr-review, handoff,
-prod-incident, llm-eval, eda, status-update, pre-delivery-audit,
-scoping), or the generic agents.
+Do not duplicate what plugins already provide: workflow skills (superpowers),
+simplicity skills (ponytail), consulting skills (this plugin), or the generic
+agents.
 
 ## 5. Close
 - Summary of created files and user confirmation before

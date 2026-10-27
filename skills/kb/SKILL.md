@@ -1,38 +1,36 @@
 ---
 name: kb
 description: >
-  Personal knowledge base of problems already solved in other projects.
-  CHECK when starting diagnosis of a non-trivial error, an integration
-  problem, or a technical decision that smells familiar. SAVE when the
-  user says "save this in the kb", "this will happen to us again", or
-  when closing a problem that was costly to solve.
+  Record and retrieve solved problems so they are not solved twice. Use RIGHT
+  AFTER fixing a non-obvious bug, integration issue, or environment problem
+  ("esto nos va a pasar de nuevo", "guardalo en la kb", "anotá la solución"),
+  and BEFORE debugging or planning when the symptom smells familiar ("¿esto ya
+  nos pasó?", "¿cómo lo resolvimos?"). Not for trivial fixes or anything
+  already documented in the repo.
 ---
 
-Lazy retrieval in two steps: never load full cases unless requested.
-State lives in `~/.mle-setup/knowledge/`.
+Two stores, searched cheaply with grep; never open every file.
 
-## Check
-1. Step 1 (cheap): grep `~/.mle-setup/knowledge/INDEX.md` with
-   2-3 symptom terms. Each index line is a case:
-   `<id> | <tags> | <symptom in one sentence>`.
-2. Step 2 (only if there is a match): read ONLY
-   `~/.mle-setup/knowledge/cases/<id>.md` for the matching case. Never
-   open all of cases/ or cases "just in case".
-3. No match (or missing index: create it with its header):
-   continue normally; do not announce that the kb had nothing.
+| Store | What goes there | Confidentiality |
+| --- | --- | --- |
+| `docs/solutions/` in the current repo | Problems specific to this project | Stays with the client repo |
+| `~/.mle-setup/knowledge/` (`INDEX.md` + `cases/`) | Patterns that transfer across clients | Must be sanitized |
 
-## Save
-1. Draft a SANITIZED case: no client name, no data,
-   no internal URLs, no contractual details. Refer to the
-   context generically ("a client's payments API",
-   "a vision pipeline in GCP"). This file travels across contexts
-   where client-to-client confidentiality is non-negotiable.
-2. Create `~/.mle-setup/knowledge/cases/<id>.md` with id
-   `YYYYMM-<slug>` and sections: Symptom / Cause / Solution /
-   How to detect it quickly next time. Maximum ~25 lines.
-3. Add the line to INDEX.md: `<id> | <3-5 tags> | <symptom>`.
-4. Show the case to the user before saving (the user checks the
-   sanitization).
+## Retrieve
+1. `grep -ril "<2-3 symptom terms>" docs/solutions/` and
+   `grep -i "<terms>" ~/.mle-setup/knowledge/INDEX.md`.
+2. Open only the matching files. No match: continue silently.
 
-Tags are retrieval: use the terms someone would shout when
-searching (error names, technologies, symptoms), not abstract categories.
+## Record (only after the fix is verified)
+1. Is it non-obvious and likely to recur? If not, skip it.
+2. Draft 10-20 lines: **Symptom** (error text, how it showed up) / **Cause** /
+   **Fix** / **Applies when** / **How to detect it quickly next time**.
+   Tags are the words someone would grep for: error names, tools, symptoms.
+3. Default: `docs/solutions/YYYY-MM-DD-<slug>.md` in the repo. If the repo's
+   `AGENTS.md` does not mention `docs/solutions/`, propose adding one line:
+   "Solved problems: `docs/solutions/` (grep before debugging or planning)."
+4. Global case only if the lesson is useful for other clients: remove client
+   names, data, internal URLs, architecture details, and identifiable metrics.
+   Save `cases/YYYYMM-<slug>.md` and add `<id> | <3-5 tags> | <symptom>` to
+   `INDEX.md` (create the folder and index if missing).
+5. Show the draft to the user before saving; they confirm sanitization.

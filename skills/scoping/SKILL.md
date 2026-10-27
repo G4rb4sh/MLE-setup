@@ -1,10 +1,10 @@
 ---
 name: scoping
 description: >
-  Scoping and technical estimation of a project or feature for a
-  client. Use when the user says "estimate", "scoping",
-  "proposal for the client", "how long would it take", or describes a
-  business problem for a new client.
+  Scope and estimate a project or feature for a client. Use when the user
+  says "estimá", "scoping", "propuesta para el cliente", "¿cuánto llevaría?",
+  "armá una cotización", or describes a business problem for a new client.
+  Not for breaking an approved plan into tasks (writing-plans).
 ---
 
 Objective: a defensible estimate with explicit assumptions, not a
