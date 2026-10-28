@@ -52,10 +52,17 @@ twice).
 The `kb` skill stores solved problems per repo in `docs/solutions/` and
 sanitized cross-client patterns in `~/.mle-setup/knowledge/`.
 
+Optional: [Engram](https://github.com/Gentleman-Programming/engram) adds automatic
+per-project memory over MCP (local SQLite in `~/.engram`, outside any repo).
+When its `mem_*` tools are present, the always-on rules tell the agent to use
+them; `kb` remains the curated record. Keep `.engram/` in your global gitignore.
+
 ## Maintenance
 Use [setup-gardener](skills/setup-gardener/SKILL.md): where to edit, how to
-verify, and authorization limits. Bump `version` in the manifests only when
-publishing. Local maintenance does not commit or push automatically.
+verify, and authorization limits. `bash skills/setup-gardener/scripts/doctor.sh`
+is a read-only health check (plugins, skill links, brands, Engram). Bump
+`version` in the manifests only when publishing. Local maintenance does not
+commit or push automatically.
 
 ## License
 MIT (see `LICENSE` and `NOTICE`).

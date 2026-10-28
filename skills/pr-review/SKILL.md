@@ -14,7 +14,17 @@ description: >
 - Find the spec: issue referenced in commits, a path the user gave, or a doc in
   `docs/`/`specs/`. If none exists, say so and skip the Spec axis.
 
-## 2. Review on separate axes (do not merge or rerank them)
+## 2. Set depth by risk
+State the tier and why at the top of the report.
+- **Low** (docs, config, tests, refactor already covered by tests): one
+  structural read, Correctness and Standards axes only.
+- **Medium** (ordinary feature or bugfix): every axis, on the changed code.
+- **High** (data migration/deletion, auth/security, shared API/schema contract,
+  concurrency, client delivery, or no test would catch a regression): every axis,
+  plus callers/consumers of changed code, failure modes, and rollback. Suggest an
+  independent second reviewer (fresh subagent or `ponytail-review`).
+
+## 3. Review on separate axes (do not merge or rerank them)
 **Spec**: requirements missing or partial; behavior not asked for (scope creep);
 requirements implemented wrongly. Quote the spec line for each.
 
@@ -31,7 +41,7 @@ external inputs validated, breaking changes to APIs/schemas flagged.
 version traceable (see `ml-repro`), metrics compared against a baseline,
 `ml-over:` when a lower rung of the ML ladder would suffice.
 
-## 3. Report
+## 4. Report
 One line per finding, `file:line — problem — fix`, ordered by severity, grouped
 by axis. Close with a verdict (ready to merge / needs changes), blockers listed
 separately from suggestions. For large diffs, suggest running `ponytail-review`.

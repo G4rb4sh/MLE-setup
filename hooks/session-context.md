@@ -21,6 +21,13 @@ If a repo has neither, offer `repo-bootstrap` before major changes.
   is justified with metrics against the one below (`llm-eval` for GenAI).
   In reviews, flag violations as `ml-over:` naming the sufficient rung.
 
+## Proportional workflow (overrides heavier skill defaults)
+- Small, understood tasks: do them inline. No brainstorm, plan, subagents, or review loop.
+- Delegate only for a reason: broad exploration (>~5 sequential lookups), parallel
+  writers on disjoint files, a long session handing off a bounded unit, or an
+  independent verifier for high-risk work (data, security, shared contracts,
+  client delivery, nothing that would catch a regression). Size alone never decides.
+
 ## Python
 Python >=3.11. Verify the real interpreter (and notebook kernel separately)
 before creating or reusing an environment; ask before any legacy exception.
@@ -28,6 +35,9 @@ before creating or reusing an environment; ask before any legacy exception.
 ## Evidence and memory
 - Never claim done/fixed/passing without running the proving command in that message.
 - After solving a non-obvious problem, offer the `kb` skill to record it.
+- If Engram (`mem_*` tools) is available: `mem_search` before asking about past
+  project work; `mem_save` verified decisions and root causes, never secrets.
+  `kb` stays the curated, reusable record.
 
 ## Communication
 Respond in Spanish, direct, no filler. Client documents in the client's language.

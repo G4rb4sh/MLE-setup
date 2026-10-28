@@ -35,6 +35,8 @@ friction; one preference is not a framework.
 | Private preferences, machine map, authorization | `MLE-setup-personal/skills/` |
 | Cross-project notes | `MLE-setup-personal/memory/` |
 | Linking across computers | `MLE-setup-personal/bin/` and its README |
+| Claude Code permission rules (secret deny-list) | `MLE-setup-personal/claude/settings.json`, merged by `bin/claude-settings.py`; never hand-edit only `~/.claude/settings.json` |
+| Engram memory (optional) | Binary/MCP registration per tool; usage rule in `hooks/session-context.md`; DB stays in `~/.engram`, never in a repo |
 | One client's/project's rule | That repo's `AGENTS.md` or `.github/instructions/` |
 
 Keep machine paths and private data out of the shared plugin. Put procedures in
@@ -48,6 +50,8 @@ touch production, install untrusted plugins, commit, push, or publish without
 an explicit request.
 
 ## 4. Verify
+- Start with `bash scripts/doctor.sh` (read-only: plugins per tool, skill links,
+  brands, Claude deny rules, Engram). Fix FAILs; explain WARNs.
 - Check the diff, frontmatter (`name` equals folder), descriptions, and paths.
 - Hooks: `bash -n` the script, run it, and parse its JSON output.
 - Hooks: test both formats (`COPILOT_CLI=1` vs only `CLAUDE_PLUGIN_ROOT` set).
