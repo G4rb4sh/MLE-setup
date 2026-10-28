@@ -13,7 +13,6 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 from docx import Document
@@ -26,7 +25,8 @@ from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 
 from brand import Brand
-from render import office_app, office_script, permission_hint, run_office_script, temp_copy_name
+from render import (dialog_hint, office_app, office_script, office_workdir, permission_hint,
+                    run_office_script, temp_copy_name)
 
 WORD = "Microsoft Word"
 TOC_TIMEOUT_S = 300
@@ -538,22 +538,23 @@ def _toc_script(copy: Path) -> str:
 def fill_toc_with_word(docx: Path) -> bool:
     """Fill the TOC with Microsoft Word (macOS). True on success; False (never raises) otherwise.
 
-    Word only ever sees a temporary copy with a unique `office-docs-<hex>.docx` name, addressed
-    by that name in every Apple event; the result replaces `docx` only on success. Documents
-    the user has open are never touched.
+    Word only ever sees a temporary copy with a unique `office-docs-<hex>.docx` name (inside
+    Word's sandbox container when possible, see `render.office_workdir`), addressed by that name
+    in every Apple event; the result replaces `docx` only on success. Documents the user has
+    open are never touched.
     """
     docx = Path(docx)
     if office_app(".docx") != WORD:
         return False
     try:
-        with tempfile.TemporaryDirectory(prefix="office-docs-toc-") as td:
-            copy = Path(td) / temp_copy_name(".docx")
+        with office_workdir(WORD) as td:
+            copy = td / temp_copy_name(".docx")
             shutil.copyfile(docx, copy)
             r = run_office_script(WORD, copy, _toc_script(copy), timeout=TOC_TIMEOUT_S)
             if r.returncode != 0:
                 err = r.stderr.strip()
                 print(f"warning: Word could not fill the table of contents ({err}); it will be "
-                      f"updated when the document is opened.", file=sys.stderr)
+                      f"updated when the document is opened.{dialog_hint(WORD, err)}", file=sys.stderr)
                 hint = permission_hint(WORD, err)
                 if hint:
                     print(hint, file=sys.stderr)

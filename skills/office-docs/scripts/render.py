@@ -14,6 +14,9 @@ to regenerate FILE.
 PDF backend, in order: macOS PowerPoint (.pptx) / Word (.docx) via osascript, then
 `soffice --headless`. Office always works on a temporary copy and closes only that copy
 (addressed by its unique file name), so documents the user has open are never touched.
+The copy and the PDF live in a fresh folder inside the app's sandbox container when this
+process may write there (else the system temp dir), so the sandboxed app does not ask for
+file access ("Grant File Access").
 """
 
 from __future__ import annotations
@@ -25,6 +28,8 @@ import subprocess
 import sys
 import tempfile
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from string import Template
@@ -35,6 +40,11 @@ SCRIPTS = Path(__file__).resolve().parent
 OFFICE_APPS = {".pptx": "Microsoft PowerPoint", ".docx": "Microsoft Word"}
 EXPORT_TIMEOUT_S = 600
 NOT_AUTHORIZED = "-1743"
+DIALOG_OPEN = "-9074"
+# Sandbox containers: Office can always read and write here without asking the user.
+_CONTAINERS = {"Microsoft PowerPoint": "com.microsoft.Powerpoint", "Microsoft Word": "com.microsoft.Word"}
+OFFICE_GROUP = "UBF8T346G9.Office"
+WORKDIR_PREFIX = "office-docs-render-"
 
 # App terminology: what a document is called and how it is saved as PDF.
 _TERMS = {
@@ -148,6 +158,43 @@ def run_office_script(app: str, copy: Path, script: str,
         raise
 
 
+def office_sandbox_dirs(app: str) -> list[Path]:
+    """Folders the sandboxed `app` can use without a file-access prompt, most specific first."""
+    home = Path.home()
+    return [home / "Library/Containers" / _CONTAINERS[app] / "Data/tmp",
+            home / "Library/Group Containers" / OFFICE_GROUP]
+
+
+@contextmanager
+def office_workdir(app: str) -> Iterator[Path]:
+    """A new `office-docs-render-*` folder for `app`'s temp copy and output, removed by exact path.
+
+    Created inside the app's sandbox container when it exists and is writable (macOS may deny
+    other apps' containers to this process), else in the system temp dir.
+    """
+    work = None
+    for base in office_sandbox_dirs(app):
+        try:
+            work = Path(tempfile.mkdtemp(prefix=WORKDIR_PREFIX, dir=base))
+            break
+        except OSError:
+            continue
+    if work is None:
+        work = Path(tempfile.mkdtemp(prefix=WORKDIR_PREFIX))
+    try:
+        yield work
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def dialog_hint(app: str, err: str) -> str:
+    """Extra advice when `app` is blocked by an open dialog (error -9074), else ""."""
+    if DIALOG_OPEN not in err:
+        return ""
+    return (f" {app} is showing a dialog (e.g. Grant File Access): press Esc in {app}, "
+            f"then retry.")
+
+
 def permission_hint(app: str, err: str) -> str | None:
     """The fix for a -1743 (Automation not allowed) error, else None."""
     if NOT_AUTHORIZED not in err:
@@ -162,8 +209,8 @@ def _office_script(app: str, copy: Path, out: Path) -> str:
 
 
 def _export_office(app: str, src: Path, pdf: Path) -> Path:
-    with tempfile.TemporaryDirectory(prefix="office-docs-render-") as td:
-        copy = Path(td) / temp_copy_name(src.suffix)
+    with office_workdir(app) as td:
+        copy = td / temp_copy_name(src.suffix)
         shutil.copyfile(src, copy)
         out = copy.with_suffix(".pdf")
         r = run_office_script(app, copy, _office_script(app, copy, out))
@@ -172,7 +219,8 @@ def _export_office(app: str, src: Path, pdf: Path) -> Path:
             hint = permission_hint(app, err)
             if hint:
                 raise RenderUnavailable(hint)
-            raise RuntimeError(f"{app} could not export {src.name} to PDF: {err}")
+            raise RuntimeError(f"{app} could not export {src.name} to PDF: {err}"
+                               f"{dialog_hint(app, err)}")
         if not out.exists():
             raise RuntimeError(f"{app} reported success but wrote no PDF for {src.name}")
         pdf.parent.mkdir(parents=True, exist_ok=True)
@@ -181,7 +229,7 @@ def _export_office(app: str, src: Path, pdf: Path) -> Path:
 
 
 def _export_soffice(soffice: str, src: Path, pdf: Path) -> Path:
-    with tempfile.TemporaryDirectory(prefix="office-docs-render-") as td:
+    with tempfile.TemporaryDirectory(prefix=WORKDIR_PREFIX) as td:
         subprocess.run([soffice, "--headless", "--convert-to", "pdf", "--outdir", td, str(src)],
                        check=True, capture_output=True, timeout=EXPORT_TIMEOUT_S)
         out = Path(td) / f"{src.stem}.pdf"

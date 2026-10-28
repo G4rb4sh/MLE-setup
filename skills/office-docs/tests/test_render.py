@@ -9,7 +9,8 @@ import pytest
 
 import render
 from conftest import SCRIPTS
-from render import RenderUnavailable, applescript_quote, export_pdf, pdf_to_png, run_build
+from render import (RenderUnavailable, applescript_quote, export_pdf, office_sandbox_dirs, pdf_to_png,
+                    run_build)
 from test_components import _deck, _png, build_smoke
 
 
@@ -162,3 +163,73 @@ def test_main_timeout_exits_2(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(render, "render", slow)
     assert render.main([str(tmp_path / "deck.pptx")]) == 2
     assert "render failed" in capsys.readouterr().err
+
+
+PP_CONTAINER = Path("Library/Containers/com.microsoft.Powerpoint/Data/tmp")
+
+
+def _fake_export(seen):
+    """A run_office_script stand-in: records the copy and the script, writes the PDF it names."""
+    def run(app, copy, script, timeout=render.EXPORT_TIMEOUT_S):
+        assert copy.exists()
+        seen.append((copy, script))
+        Path(re.search(r'set pdfPath to "(.+)"', script).group(1)).write_bytes(b"%PDF")
+        return subprocess.CompletedProcess(["osascript"], 0, "", "")
+    return run
+
+
+def test_copy_lives_in_app_container(monkeypatch, tmp_path):
+    home = tmp_path / "home"
+    (home / PP_CONTAINER).mkdir(parents=True)
+    monkeypatch.setattr(render, "office_sandbox_dirs", office_sandbox_dirs)
+    monkeypatch.setattr(render.Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setattr(render, "office_app", lambda suffix: "Microsoft PowerPoint")
+    seen = []
+    monkeypatch.setattr(render, "run_office_script", _fake_export(seen))
+    src = tmp_path / "deck.pptx"
+    src.write_bytes(b"")
+    assert export_pdf(src, tmp_path / "out" / "deck.pdf").read_bytes() == b"%PDF"
+    [(copy, script)] = seen
+    work = copy.parent
+    assert work.parent == home / PP_CONTAINER and work.name.startswith("office-docs-render-")
+    assert f"set pdfPath to {applescript_quote(work / copy.with_suffix('.pdf').name)}" in script
+    assert not work.exists() and list((home / PP_CONTAINER).iterdir()) == []
+
+
+@pytest.mark.parametrize("state", ["missing", "denied"])
+def test_copy_falls_back_to_temp(monkeypatch, tmp_path, state):
+    home = tmp_path / "home"
+    container = home / PP_CONTAINER
+    if state == "denied":
+        container.mkdir(parents=True)
+        container.chmod(0o500)
+    monkeypatch.setattr(render, "office_sandbox_dirs", office_sandbox_dirs)
+    monkeypatch.setattr(render.Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setattr(render, "office_app", lambda suffix: "Microsoft PowerPoint")
+    seen = []
+    monkeypatch.setattr(render, "run_office_script", _fake_export(seen))
+    src = tmp_path / "deck.pptx"
+    src.write_bytes(b"")
+    try:
+        export_pdf(src, tmp_path / "deck.pdf")
+    finally:
+        if state == "denied":
+            container.chmod(0o700)
+    work = seen[0][0].parent
+    assert home not in work.parents and work.name.startswith("office-docs-render-")
+    assert not work.exists()
+
+
+def test_failed_export_removes_workdir(monkeypatch, tmp_path):
+    home = tmp_path / "home"
+    (home / PP_CONTAINER).mkdir(parents=True)
+    monkeypatch.setattr(render, "office_sandbox_dirs", office_sandbox_dirs)
+    monkeypatch.setattr(render.Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setattr(render, "office_app", lambda suffix: "Microsoft PowerPoint")
+    monkeypatch.setattr(render.subprocess, "run",
+                        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, "", "boom (-9074)"))
+    src = tmp_path / "deck.pptx"
+    src.write_bytes(b"")
+    with pytest.raises(RuntimeError, match="press Esc in Microsoft PowerPoint"):
+        export_pdf(src, tmp_path / "deck.pdf")
+    assert list((home / PP_CONTAINER).iterdir()) == []

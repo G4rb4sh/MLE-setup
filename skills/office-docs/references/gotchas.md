@@ -61,11 +61,22 @@ the earlier decks and documents this kit replaces.
 - **The first run may need the Automation permission:** System Settings →
   Privacy & Security → Automation lets your terminal control PowerPoint or
   Word. Without it, render fails with error -1743 and prints this hint.
-- **"Grant File Access" ("Conceder acceso al archivo") dialog:** a sandboxed
-  PowerPoint can sometimes ask for access to the `office-docs-xxxxxxxx.pptx`
-  copy. Render then waits until it times out (600 s). Later renders fail
-  right away with error -9074 until the dialog is closed. Press Esc or click
-  Cancel in PowerPoint, then run the render again.
+- **"Grant File Access" ("Conceder acceso al archivo") dialog:** Office is
+  sandboxed, so render puts the `office-docs-xxxxxxxx` copy and its PDF in a
+  fresh `office-docs-render-*` folder inside the app's own container
+  (`~/Library/Containers/com.microsoft.Powerpoint/Data/tmp`, or `...Word...`),
+  else the Office group container, and deletes that folder afterwards. Office
+  can always read and write there, so the dialog should no longer appear.
+  If macOS does not let your terminal write into the container ("access data
+  from other apps"), render falls back to the system temp folder, where the
+  dialog can still show up: render then waits until it times out (600 s), and
+  later renders fail right away with error -9074 (the message says so) until
+  the dialog is closed. Press Esc or click Cancel in PowerPoint/Word, then run
+  the render again. Allowing the terminal to access other apps' data avoids
+  the fallback. macOS decides this per app: Word's container (and the Office
+  group containers) can be off limits ("Operation not permitted") even when
+  PowerPoint's is writable, so `.docx` renders and the Word TOC fill may still
+  use the system temp folder and can still hit the dialog.
 - A render that hangs for another reason times out after 600 s and closes
   the copy by name.
 - `--out DIR` deletes numbered PNGs (`01.png`...) that are already in DIR, so

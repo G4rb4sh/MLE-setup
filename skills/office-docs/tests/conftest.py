@@ -28,3 +28,12 @@ def make_brand(tmp_path: Path) -> Callable[[str, str], Path]:
         return folder
 
     return _make
+
+
+@pytest.fixture(autouse=True)
+def _no_real_office_containers(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit tests never create folders in the real Office sandbox containers (real_* tests do)."""
+    if "real_" not in request.node.name:
+        import render
+
+        monkeypatch.setattr(render, "office_sandbox_dirs", lambda app: [])

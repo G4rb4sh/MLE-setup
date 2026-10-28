@@ -223,7 +223,7 @@ def test_extract_cli(client_pptx, tmp_path, capsys):
 
 
 @pytest.mark.skipif(os.environ.get("OFFICE_DOCS_RENDER") != "1", reason="set OFFICE_DOCS_RENDER=1")
-def test_extract_renders_samples(client_pptx, tmp_path):
+def test_real_extract_renders_samples(client_pptx, tmp_path):
     rep = brand_from_pptx(client_pptx, "cliente", tmp_path / "brands")
     assert rep.samples and all(p.suffix == ".png" and p.stat().st_size > 0 for p in rep.samples)
 

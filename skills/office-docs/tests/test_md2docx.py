@@ -16,6 +16,7 @@ import md2docx
 from brand import load_brand
 from md2docx import DocMeta, build_docx, parse_front_matter, render_mermaid
 from render import applescript_quote
+from render import office_sandbox_dirs as ORIGINAL_SANDBOX_DIRS
 from test_components import _png
 
 pytestmark = pytest.mark.skipif(shutil.which("pandoc") is None, reason="needs pandoc")
@@ -344,6 +345,27 @@ def test_fill_toc_copies_result_back(monkeypatch, tmp_path):
     path = _docx(tmp_path / "a.docx")
     assert docx_brand.fill_toc_with_word(path) is True
     assert path.read_bytes() == b"updated by word"
+
+
+def test_fill_toc_copy_lives_in_word_container(monkeypatch, tmp_path):
+    import render
+
+    home = tmp_path / "home"
+    container = home / "Library/Containers/com.microsoft.Word/Data/tmp"
+    container.mkdir(parents=True)
+    seen = []
+
+    def run(cmd, input, **kw):
+        seen.append(Path(re.search(r'set src to "(.+)"', input).group(1)))
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(render, "office_sandbox_dirs", ORIGINAL_SANDBOX_DIRS)
+    monkeypatch.setattr(render.Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setattr(docx_brand, "office_app", lambda suffix: "Microsoft Word")
+    monkeypatch.setattr(docx_brand.subprocess, "run", run)
+    assert docx_brand.fill_toc_with_word(_docx(tmp_path / "a.docx")) is True
+    assert seen[0].parent.parent == container and seen[0].parent.name.startswith("office-docs-render-")
+    assert list(container.iterdir()) == []
 
 
 def _word_documents() -> list[str]:
