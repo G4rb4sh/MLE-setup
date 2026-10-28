@@ -83,7 +83,11 @@ with timeout of $timeout seconds
     on error m number n
       set failure to {m, n}
     end try
-    close $noun nm saving no
+    try
+      close $noun nm saving no
+    on error m number n
+      if failure is missing value then set failure to {m, n}
+    end try
     if failure is not missing value then error (item 1 of failure) number (item 2 of failure)
   end tell
 end timeout

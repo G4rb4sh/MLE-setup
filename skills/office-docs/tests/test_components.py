@@ -204,3 +204,97 @@ def test_section_caption_readable(make_brand, tmp_path, style):
     s = d.section_slide("02", "Sección", image=_png(tmp_path / "i.png", 30, 20), caption="Epígrafe")
     (cap,) = _runs(s, "Epígrafe")
     assert cap.font.color.rgb == d.color("on_primary")
+
+
+def _tops(slide, name):
+    return sorted(sh.top / 914400 for sh in slide.shapes if sh.name == name)
+
+
+def test_cards_rows_stack_without_overlap(make_brand):
+    from deck_check import check_presentation
+
+    d = _deck(make_brand, "modern")
+    s, top = d.content_slide("k", "Dos filas")
+    row = [{"title": "A", "lines": ["uno", "dos"]}, {"title": "B", "lines": ["tres"]}]
+    y = d.cards_row(s, top, row, height=2.1, valign="top")
+    assert y == pytest.approx(top + 2.1)
+    y2 = d.cards_row(s, y + 0.3, row, height=2.1, valign="top")
+    assert y2 == pytest.approx(y + 0.3 + 2.1) and y2 <= d._body_bottom
+    t1, t2 = _tops(s, "card")[0], _tops(s, "card")[-1]
+    assert t1 == pytest.approx(top, abs=1e-3) and t2 >= t1 + 2.1
+    assert check_presentation(d.prs) == []
+
+
+def test_bias_is_default_and_returns_bottom(make_brand):
+    d = _deck(make_brand, "modern")
+    s, top = d.content_slide("k", "t")
+    bias = (d._body_bottom - top - 3.2) * 0.3
+    y = d.cards_row(s, top, [{"title": "A", "lines": ["x"]}])
+    assert _tops(s, "card") == [pytest.approx(top + bias, abs=1e-3)]
+    assert y == pytest.approx(top + bias + 3.2)
+
+
+def _drawn_top(s, n0):
+    """Top (inches) of the shapes added to `s` after its first `n0` shapes."""
+    return min(sh.top for sh in list(s.shapes)[n0:]) / 914400
+
+
+def test_compare_valign_and_return(make_brand):
+    d = _deck(make_brand, "modern")
+    s, top = d.content_slide("k", "t")
+    n0 = len(s.shapes)
+    y = d.compare(s, top, "A", ["x"], "B", ["y"])
+    bias = (d._body_bottom - top - 3.7) * 0.3
+    assert y == pytest.approx(top + bias + 3.7)
+    assert _drawn_top(s, n0) == pytest.approx(top + bias, abs=1e-3)
+    s, top = d.content_slide("k", "t")
+    n0 = len(s.shapes)
+    assert d.compare(s, top, "A", ["x"], "B", ["y"], valign="top") == pytest.approx(top + 3.7)
+    assert _drawn_top(s, n0) == pytest.approx(top, abs=1e-3)
+
+
+def test_code_block_valign_and_return(make_brand):
+    d = _deck(make_brand, "modern")
+    s, top = d.content_slide("k", "t")
+    n0 = len(s.shapes)
+    bias = (d._body_bottom - top - 1.6) * 0.3
+    assert d.code_block(s, top, ["x = 1"], height=1.6) == pytest.approx(top + bias + 1.6)
+    assert _drawn_top(s, n0) == pytest.approx(top + bias, abs=1e-3)
+    s, top = d.content_slide("k", "t")
+    n0 = len(s.shapes)
+    y = d.code_block(s, top, ["x = 1"], height=1.6, note="nota", valign="top")
+    assert y == pytest.approx(top + 1.6 + 0.12 + 0.35)
+    assert _drawn_top(s, n0) == pytest.approx(top, abs=1e-3)
+
+
+def test_valign_validated(make_brand):
+    d = _deck(make_brand, "modern")
+    s, top = d.content_slide("k", "t")
+    for call in (lambda: d.cards_row(s, top, [{"title": "A", "lines": []}], valign="middle"),
+                 lambda: d.compare(s, top, "A", [], "B", [], valign="middle"),
+                 lambda: d.code_block(s, top, [], valign="middle")):
+        with pytest.raises(ValueError, match="valign"):
+            call()
+
+
+@pytest.mark.parametrize("style", STYLES)
+def test_section_kicker(make_brand, style):
+    d = _deck(make_brand, style)
+    assert "SECCIÓN 01" in _all_text(d.section_slide("01", "Uno"))
+    s = d.section_slide("02", "Dos", kicker="PARTE")
+    assert "PARTE 02" in _all_text(s) and "SECCIÓN" not in _all_text(s)
+
+
+def test_empty_lists(make_brand):
+    """Matches deck-api.md: these raise ZeroDivisionError on an empty list, the others draw without items."""
+    d = _deck(make_brand, "modern")
+    s, top = d.content_slide("k", "t")
+    raising = {"cards_row": lambda: d.cards_row(s, top, []), "stat_row": lambda: d.stat_row(s, top, []),
+               "timeline": lambda: d.timeline(s, top, []), "chain": lambda: d.chain(s, 1, 2, 10, 1, []),
+               "numbered_grid": lambda: d.numbered_grid(s, top, []), "image_row": lambda: d.image_row(s, top, [])}
+    for call in raising.values():
+        with pytest.raises(ZeroDivisionError):
+            call()
+    assert d.maprow(s, top, []) == top
+    d.compare(s, top, "A", [], "B", [])
+    d.code_block(s, top, [])

@@ -28,6 +28,7 @@ LABEL_REL = (
 LABEL_CT = ('<Override PartName="/docMetadata/LabelInfo.xml" '
             'ContentType="application/vnd.ms-office.classificationlabels+xml"/>')
 SECRET = "Proyecto Secreto"
+TEMPLATE_FILE = "plantilla-acme.potx"
 CUSTOM_XML = (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
     '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" '
@@ -58,7 +59,7 @@ _PNG = _png_bytes()
 @pytest.fixture
 def client_pptx(tmp_path):
     """A client-like deck: 2 slides (with notes) of SECRET, "Cliente X" on the Title Slide layout,
-    author "Ana", a Company in app.xml, a sensitivity label (LabelInfo.xml and an MSIP_Label_ custom
+    author "Ana", a Company and a Template path in app.xml, a sensitivity label (LabelInfo.xml and an MSIP_Label_ custom
     property) and a custom property holding SECRET injected into the zip."""
     prs = Presentation()
     slides = []
@@ -87,9 +88,10 @@ def client_pptx(tmp_path):
             elif item.filename == "_rels/.rels":
                 data = data.replace(b"</Relationships>", (LABEL_REL + CUSTOM_REL).encode() + b"</Relationships>")
             elif item.filename == "docProps/app.xml":
-                data = re.sub(rb"<(Company|Manager)>.*?</\1>|<(Company|Manager)/>", b"", data)
+                data = re.sub(rb"<(Company|Manager|Template)>.*?</\1>|<(Company|Manager|Template)/>", b"", data)
                 data = data.replace(b"</Properties>",
-                                    f"<Company>{SECRET} SA</Company><Manager>Ana</Manager></Properties>"
+                                    f"<Company>{SECRET} SA</Company><Manager>Ana</Manager>"
+                                    f"<Template>C:\\Clientes\\{SECRET}\\{TEMPLATE_FILE}</Template></Properties>"
                                     .encode())
             zout.writestr(item, data)
         zout.writestr("docMetadata/LabelInfo.xml", LABEL_XML)
@@ -119,6 +121,7 @@ def test_slides_removed_and_props_cleared(extracted):
                 if re.match(r"ppt/(slides|notesSlides|comments|printerSettings)/|docProps/thumbnail", n)]
     assert b"<Company>" not in parts["docProps/app.xml"].replace(b"<Company></Company>", b"")
     assert b"Ana" not in parts["docProps/app.xml"]
+    assert TEMPLATE_FILE.encode() not in parts["docProps/app.xml"]
 
 
 def test_template_package_is_consistent(extracted):
@@ -191,12 +194,16 @@ def test_extract_refuses_existing_brand(extracted, client_pptx, tmp_path):
         brand_from_pptx(client_pptx, "cliente", tmp_path / "brands", render_samples=False)
 
 
-def test_master_images_copied(tmp_path, client_pptx):
+def _with_master_logo(tmp_path, client_pptx, **alt):
+    """client_pptx plus a picture on the first master; `alt` sets cNvPr attributes (descr, title)."""
     prs = Presentation(str(client_pptx))
     png = tmp_path / "logo.png"
     png.write_bytes(_PNG)
     slide = prs.slides[0]
     pic = slide.shapes.add_picture(str(png), Inches(0.2), Inches(0.2))
+    pic.name = "Logo 7"
+    for k, v in alt.items():
+        pic._element.nvPicPr.cNvPr.set(k, v)
     rid = pic._element.blipFill.blip.rEmbed
     master = prs.slide_masters[0]
     new_rid = master.part.relate_to(slide.part.related_part(rid), RT.IMAGE)
@@ -205,9 +212,21 @@ def test_master_images_copied(tmp_path, client_pptx):
     master.shapes._spTree.append(pic._element)
     src = tmp_path / "with-logo.pptx"
     prs.save(str(src))
-    rep = brand_from_pptx(src, "logo", tmp_path / "brands", render_samples=False)
+    return src
+
+
+def test_master_images_copied(tmp_path, client_pptx):
+    rep = brand_from_pptx(_with_master_logo(tmp_path, client_pptx), "logo", tmp_path / "brands",
+                          render_samples=False)
     assert [p.parent.name for p in rep.images] == ["assets-review"]
     assert rep.images[0].read_bytes() == _PNG
+
+
+def test_alt_text_reported(tmp_path, client_pptx):
+    src = _with_master_logo(tmp_path, client_pptx, descr="Logo de Cliente X", title="Marca Cliente X")
+    rep = brand_from_pptx(src, "logo", tmp_path / "brands", render_samples=False)
+    assert ("master 1 / Logo 7 (alt text)", "Logo de Cliente X") in rep.texts
+    assert ("master 1 / Logo 7 (alt title)", "Marca Cliente X") in rep.texts
 
 
 def test_extract_cli(client_pptx, tmp_path, capsys):

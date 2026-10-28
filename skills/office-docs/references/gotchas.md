@@ -10,9 +10,13 @@ the earlier decks and documents this kit replaces.
   `"title"` and on title placeholders. Shorten the title or move detail to
   the kicker or lead.
 - **The layout check is advisory and heuristic.** It estimates text size at
-  about 0.5 em per glyph and 1.2 line height. It skips boxes with autofit and
-  flags overlaps only between text shapes that cross without one containing
-  the other.
+  about 0.5 em per glyph and 1.2 line height. It skips boxes with autofit.
+  - `overlap`: two text shapes cross without one containing the other.
+  - `covered`: a filled shape or a picture drawn after a text shape crosses
+    it without containing it, so it hides part of the text. Shapes drawn
+    before the text (card backgrounds) and shapes that fully contain it
+    (scrims) are not flagged. Fix it by drawing the shape first, moving it,
+    or stacking rows with `valign="top"` (see `deck-api.md`).
   - Template placeholders inherit autofit and font size from the layout, so on
     template slides an overflow warning can be a false positive or a false
     negative.
@@ -20,8 +24,13 @@ the earlier decks and documents this kit replaces.
   - Text boxes that exactly touch can flag as overlapping because of floating
     point. Leave a small gap.
   - An `OK` does not replace looking at the PNGs.
-- **Empty lists** passed to `cards_row`, `stat_row`, `timeline` or `image_row`
-  raise `ZeroDivisionError`. Pass at least one item or skip the component.
+- **Empty lists** passed to `cards_row`, `stat_row`, `timeline`, `chain`,
+  `numbered_grid` or `image_row` raise `ZeroDivisionError`. Pass at least one
+  item or skip the component.
+- **Stacked rows overlap by default.** `cards_row`, `compare` and
+  `code_block` move down by 30% of the free space below `top`, as if alone on
+  the slide. To stack them, pass `valign="top"` and start the next one at the
+  y they return. The check flags the overlap as `covered`.
 - **Dark style:** `stat_row`, `maprow`, `numbered_grid`, `code_block` and the
   right panel of `compare` fill with `primary`, which in `dark` is close to the
   background. Set a lighter `primary` in the brand, or compose those panels
@@ -36,10 +45,11 @@ the earlier decks and documents this kit replaces.
 
 ## Template brands (brands with `[deck] template`)
 
-- **Set `content_bg` and the colors to match the template's background.**
-  Content drawn on template slides picks its text contrast against
-  `[components] content_bg`, not the master. On a dark template with the
-  default light `content_bg`, drawn text comes out dark on dark.
+- **Set `[colors] background` to the template's background.** Content drawn
+  on template slides picks its text contrast against the token named by
+  `[components] content_bg` (`"background"` by default), not the master. On
+  a dark template with the default light `background`, drawn text comes out
+  dark on dark.
 - **Mapped content slides get no drawn footer or page number.** The footer is
   whatever the master shows, and python-pptx does not copy the layout's
   slide-number placeholder, so there is no page number unless the master
@@ -125,11 +135,14 @@ the earlier decks and documents this kit replaces.
 - **The report lists every text in masters and layouts**, placeholder
   prompts included. Review it for client names, project names, people and
   numbers before `--confirm`.
-- **Not stripped and not reported:** tags, chart and SmartArt text, and alt
-  text on masters. Check them manually in PowerPoint (View → Slide Master).
+- **The report also lists alt text** (the description and title of any
+  shape or picture) in masters and layouts.
+- **Not stripped and not reported:** tags, and chart and SmartArt text. Check
+  them manually in PowerPoint (View → Slide Master).
 - **Sensitivity labels are kept on purpose** and reported. Decks built from
   the template inherit the label.
-- Not cleared either: the `Template` field in `app.xml` and the core dates.
+- The `Template` field in `app.xml` (often a path to the client's file) is
+  cleared. The core dates are not.
 - A hyperlink on a master that points to a removed relationship can make
   PowerPoint offer to repair the file. Remove that link from the template.
 - Layout roles are guessed from layout names. Check `[deck.layouts]` against

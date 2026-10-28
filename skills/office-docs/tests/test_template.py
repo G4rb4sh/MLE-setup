@@ -8,23 +8,24 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from brand import BrandError, load_brand
 from deck import Deck
+from deck_check import check_presentation
 
 
 @pytest.fixture
-def template_brand(make_brand, tmp_path):
+def template_brand(make_brand):
     """Brand on python-pptx's default template (saved with 2 slides); `layouts` is the [deck.layouts] body."""
     prs = Presentation()
     for i in (0, 1):
         prs.slides.add_slide(prs.slide_layouts[i]).shapes.title.text = f"old {i}"
-    (tmp_path / "tmp").mkdir(exist_ok=True)
-    prs.save(str(tmp_path / "tmp" / "template.pptx"))
 
     def _make(layouts='title = "Title Slide"\ncontent = "Title Only"'):
-        return make_brand(
+        folder = make_brand(
             "tpl",
-            f'[fonts]\nbody = "Calibri"\n[deck]\ntemplate = "../../tmp/template.pptx"\n'
+            f'[fonts]\nbody = "Calibri"\n[deck]\ntemplate = "template.pptx"\n'
             f'footer = "Lab X"\n[deck.layouts]\n{layouts}\n',
         )
+        prs.save(str(folder / "template.pptx"))
+        return folder
 
     return _make
 
@@ -91,8 +92,12 @@ def test_section_layout_with_image(template_brand, tmp_path):
     d = Deck(template_brand('section = "Section Header"'))
     s = d.section_slide("02", "Con imagen", image=png, caption="Epígrafe")
     assert s.slide_layout.name == "Section Header"
-    assert [sh.shape_type for sh in s.shapes].count(MSO_SHAPE_TYPE.PICTURE) == 1
+    types = [sh.shape_type for sh in s.shapes]
+    assert types.count(MSO_SHAPE_TYPE.PICTURE) == 1
     assert _empty_placeholders(s) == []
+    # the picture goes behind the layout's text, so it never hides the title or the kicker
+    assert types.index(MSO_SHAPE_TYPE.PICTURE) < min(i for i, sh in enumerate(s.shapes) if sh.is_placeholder)
+    assert [i for i in check_presentation(d.prs) if i.kind == "covered"] == []
 
 
 def test_missing_layout_lists_available(template_brand):
@@ -191,3 +196,16 @@ def test_kicker_in_small_body_above_title(template_brand):
     _as_body(layout, top=title_top - 0.5, height=0.4)
     s, _ = d.content_slide("k", "T")
     assert [ph.text_frame.text for ph in s.placeholders] == ["T", "k"]
+
+
+def test_layout_without_title_adds_no_slide(template_brand):
+    d = Deck(template_brand('content = "Blank"'))
+    with pytest.raises(BrandError, match="no title placeholder"):
+        d.content_slide("k", "T")
+    assert len(d.prs.slides) == 0 and d.page == 0
+
+
+def test_section_kicker_on_layout(template_brand):
+    d = Deck(template_brand('section = "Section Header"'))
+    s = d.section_slide("03", "Sección", kicker="PARTE")
+    assert [ph.text_frame.text for ph in s.placeholders] == ["Sección", "PARTE 03"]

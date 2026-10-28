@@ -133,24 +133,29 @@ folder. Render both, show them to the user, adjust `brand.toml` until they
 approve, then delete the samples folder.
 
 **From a .pptx** (a corporate or client template):
-1. Run `uv run "$OD/scripts/brand_from_pptx.py" template.pptx acme`. It
-   writes a **draft** brand: the template without slides, notes, comments or
+1. Run `uv run "$OD/scripts/brand_from_pptx.py" template.pptx acme` (add
+   `--out DIR` to write it outside `~/.mle-setup/brands`). It writes a
+   **draft** brand: the template without slides, notes, comments or
    authors, the theme colors and fonts, and guessed layout roles. It also
    prints a report. A draft brand refuses to load.
 2. Show the user the whole report: every text found in masters and layouts,
    every image copied to `acme/assets-review/`, and the sample PNGs in
    `acme/assets-review/samples/`. Also say whether a sensitivity label was
-   kept. Point out anything that looks client-specific. Tags, chart or
-   SmartArt text, and alt text on masters are not reported, so open the
-   template's Slide Master and check them by hand.
+   kept. Point out anything that looks client-specific, alt text included.
+   Tags and chart or SmartArt text are not reported, so open the template's
+   Slide Master and check them by hand.
 3. **Wait for the user's explicit confirmation** that nothing client-specific
    remains. If something does, remove it from `acme/template.pptx` in
    PowerPoint (View → Slide Master), or drop the brand and start over.
-4. Only then run `uv run "$OD/scripts/brand_from_pptx.py" --confirm ~/.mle-setup/brands/acme`.
-   Review `[deck.layouts]` (the roles `title`, `section`, `content`, `final`)
-   and set `[colors] content_bg` and the colors to match the template's
-   background (see `references/gotchas.md`). `--confirm` only removes the
-   draft flag; delete `acme/assets-review/` once the brand is approved.
+4. Edit `acme/brand.toml`. Review `[deck.layouts]` (the roles `title`,
+   `section`, `content`, `final`). Set `[colors] background` to the
+   template's background hex, leave `[components] content_bg` at
+   `"background"` (the default), and match the other colors (see
+   `references/gotchas.md`).
+5. Only then run `uv run "$OD/scripts/brand_from_pptx.py" --confirm DIR/acme`,
+   where `DIR` is the `--out` folder (default `~/.mle-setup/brands`).
+   `--confirm` only removes the draft flag. Delete `acme/assets-review/` once
+   the brand is approved.
 
 ## References
 

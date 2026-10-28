@@ -57,7 +57,7 @@ margin = 0.6
 columns = 12
 gutter = 0.2
 
-[logos]                          # name = path relative to the brand folder; use any names
+[logos]                          # name = path inside the brand folder (relative); use any names
 light = "logo-light.png"         # Word puts it in the page header
 dark = "logo-dark.png"           # Word puts it on the cover band (dark background)
 
@@ -85,7 +85,8 @@ Validation:
 - An unknown key in `[colors]`, `[components]` or `[grid]` raises `BrandError`
   and lists the valid keys.
 - So do a bad hex, an unknown style, a missing `fonts.body`, and a missing
-  logo, template or reference file.
+  logo, template or reference file, or one outside the brand folder (`../`
+  or an absolute path).
 - Logos are never placed on slides automatically. Use
   `d.image(s, d.brand.logos["light"], ...)` (see `deck-api.md`).
 
@@ -130,6 +131,7 @@ When `[deck] template` is set:
   the fewest placeholders, so the master's background shows through.
 - Components and primitives are always drawn on top.
 
-Set `[components] content_bg` and the colors to match the template's real
-background. Drawn text picks its contrast against `content_bg`, not against
-the master. See `gotchas.md` for the other limits of template brands.
+Set `[colors] background` to the template's real background and leave
+`[components] content_bg = "background"`, then match the other colors. Drawn
+text picks its contrast against the `content_bg` token, not against the
+master. See `gotchas.md` for the other limits of template brands.

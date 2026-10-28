@@ -16,6 +16,7 @@ from brand import NODE_SHAPES, BrandError
 from deck_prims import CAPTION_H, EMU_PER_IN, est_lines
 
 NODE_STATES = ("done", "planned")
+VALIGNS = ("bias", "top")
 TITLE_PLACEHOLDERS = (PP_PLACEHOLDER.TITLE, PP_PLACEHOLDER.CENTER_TITLE)
 KICKER_MAX_H = 1.0  # inches: tallest body placeholder taken as a kicker slot on content slides
 
@@ -48,6 +49,12 @@ class Components:
     def _body_bottom(self) -> float:
         return self.H - 0.8
 
+    def _place(self, top: float, height: float, valign: str) -> float:
+        """Block top: "bias" lowers a lone block by 30% of the free space below it; "top" keeps `top`."""
+        if valign not in VALIGNS:
+            raise ValueError(f"valign {valign!r} is not one of {', '.join(VALIGNS)}")
+        return top + max(0.0, (self._body_bottom - top - height) * 0.3) if valign == "bias" else top
+
     def _mix(self, a: str, b: str, t: float) -> str:
         """Hex between colors `a` (t=0) and `b` (t=1)."""
         ca, cb = self.color(a), self.color(b)
@@ -76,12 +83,12 @@ class Components:
         layout = self.layout(role)
         if layout is None:
             return None
+        if not any(ph.placeholder_format.type in TITLE_PLACEHOLDERS for ph in layout.placeholders):
+            raise BrandError(f"deck.layouts.{role}: layout {layout.name!r} has no title placeholder")
         s = self.prs.slides.add_slide(layout)
         self.page += 1
         phs = list(s.placeholders)
-        t = next((ph for ph in phs if ph.placeholder_format.type in TITLE_PLACEHOLDERS), None)
-        if t is None:
-            raise BrandError(f"deck.layouts.{role}: layout {layout.name!r} has no title placeholder")
+        t = next(ph for ph in phs if ph.placeholder_format.type in TITLE_PLACEHOLDERS)
         t.name = "title"
         t.text_frame.text = title
         slots = sorted(
@@ -112,12 +119,18 @@ class Components:
                       font="heading", bold=True)
         return s
 
-    def section_slide(self, number, title, image=None, caption=None):
-        """Section divider; with `image` the big number is replaced by the picture."""
-        s = self._layout_slide("section", title, f"SECCIÓN {number}")
+    def section_slide(self, number, title, image=None, caption=None, kicker="SECCIÓN"):
+        """Section divider; the kicker reads "{kicker} {number}"; with `image` the big number is replaced
+        by the picture."""
+        label = f"{kicker} {number}".strip()
+        s = self._layout_slide("section", title, label)
         if s is not None:
             if image:
+                n0 = len(s.shapes)
                 self.image(s, image, self.W - 4.83, 0.9, 4.2, 5.7, caption=caption)
+                tree = s.shapes._spTree  # behind the layout's text: children 0-1 are the group's own props
+                for el in reversed([sh._element for sh in list(s.shapes)[n0:]]):
+                    tree.insert(2, el)
             return s
         s = self.blank_slide("primary")
         tw = 7.4
@@ -126,7 +139,7 @@ class Components:
         else:
             self.text(s, self.W - 5.13, 0.95, 5.0, 5.6, number, size=320, font="heading", bold=True,
                       color=self._mix("primary", "on_primary", 0.12), align="right", anchor="middle")
-        self.text(s, self._m, 2.55, tw, 0.4, f"SECCIÓN {number}", size=14, color="highlight",
+        self.text(s, self._m, 2.55, tw, 0.4, label, size=14, color="highlight",
                   font="heading", bold=True)
         self.rect(s, self._m, 3.05, 1.0, 0.09, fill="highlight")
         self.text(s, self._m, 3.3, tw, 1.6, title, size=44, color="on_primary", font="heading", bold=True)
@@ -223,14 +236,16 @@ class Components:
             paras += [_gap(10), [{"text": tag, "size": 10, "color": "muted", "italic": True}]]
         self.text(s, x + pad_l, ty, w - pad_l - 0.3, y + h - 0.15 - ty, paras, anchor="middle")
 
-    def cards_row(self, s, top, cards, height=3.2):
-        """Cards side by side. Items: {title, lines, accent?, tag?, icon?}."""
+    def cards_row(self, s, top, cards, height=3.2, valign="bias"):
+        """Cards side by side. Items: {title, lines, accent?, tag?, icon?}. Returns the row's bottom y;
+        stack rows with valign="top" (see _place)."""
+        y = self._place(top, height, valign)
         n, gap = len(cards), 0.3
         cw = (self.W - 2 * self._m - gap * (n - 1)) / n
-        y = top + max(0.0, (self._body_bottom - top - height) * 0.3)
         for i, c in enumerate(cards):
             self._card(s, self._m + i * (cw + gap), y, cw, height, c["title"], c["lines"],
                       c.get("accent", "accent"), c.get("tag"), c.get("icon"))
+        return y + height
 
     # ── content components ──
     def stat_row(self, s, top, stats):
@@ -254,11 +269,12 @@ class Components:
                           {"text": it, "size": size, "color": color}])
         return paras
 
-    def compare(self, s, top, ltitle, litems, rtitle, ritems):
-        """Two panels: a neutral "before" on the left, a highlighted "after" on the right."""
+    def compare(self, s, top, ltitle, litems, rtitle, ritems, valign="bias"):
+        """Two panels: a neutral "before" on the left, a highlighted "after" on the right; returns the
+        bottom y."""
         gap, h = 0.4, 3.7
         cw = (self.W - 2 * self._m - gap) / 2
-        top += max(0.0, (self._body_bottom - top - h) * 0.3)
+        top = self._place(top, h, valign)
         sides = ((self._m, ltitle, litems, "surface", "card_border", "muted", "muted", "text"),
                  (self._m + cw + gap, rtitle, ritems, "primary", None, "accent", "highlight", "on_primary"))
         for x, title, items, fill, line, head, marker, color in sides:
@@ -268,6 +284,7 @@ class Components:
                       font="heading", bold=True, anchor="middle")
             self.text(s, x + 0.3, top + 0.75, cw - 0.6, h - 0.95, self._items(items, 13, marker, color),
                       anchor="middle")
+        return top + h
 
     def timeline(self, s, top, steps, box_h=2.5):
         """Numbered steps in a row. Steps: {t, a} (title, annotation)."""
@@ -335,16 +352,19 @@ class Components:
                       align="center", anchor="middle")
             self.text(s, x + bd + 0.22, y, cw - bd - 0.22, bd, label, size=14, anchor="middle", line_spacing=1.0)
 
-    def code_block(self, s, top, lines, height=3.6, note=None):
-        """Monospaced block on a primary panel; lines starting with "# " are highlighted."""
+    def code_block(self, s, top, lines, height=3.6, note=None, valign="bias"):
+        """Monospaced block on a primary panel; lines starting with "# " are highlighted. Returns the
+        bottom y (below the note, if any)."""
         w = self.W - 2 * self._m
-        y = top + max(0.0, (self._body_bottom - top - height) * 0.3)
+        y = self._place(top, height, valign)
         self.rect(s, self._m, y, w, height, fill="primary", radius=0.03)
         paras = [[{"text": ln, "color": "highlight" if ln.startswith("# ") else "on_primary"}] for ln in lines]
         self.text(s, self._m + 0.45, y + 0.32, w - 0.9, height - 0.6, paras, size=13, font="mono",
                   line_spacing=1.25)
         if note:
             self.text(s, self._m, y + height + 0.12, w, 0.35, note, size=11, color="muted", italic=True)
+            return y + height + 0.47
+        return y + height
 
     # ── images ──
     def image_row(self, s, top, items, height=None):

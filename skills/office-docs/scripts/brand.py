@@ -145,6 +145,8 @@ def _asset(root: Path, value: object, key: str) -> Path:
     if not isinstance(value, str) or not value:
         raise BrandError(f"{key}: expected a file path relative to the brand folder")
     path = root / value
+    if not path.resolve().is_relative_to(root.resolve()):
+        raise BrandError(f"{key}: {value!r} points outside the brand folder {root}")
     if not path.is_file():
         raise BrandError(f"{key}: file not found: {path}")
     return path

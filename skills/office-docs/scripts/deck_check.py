@@ -3,7 +3,8 @@
     issues = check_file("out.pptx")   # or check_presentation(deck.prs)
 
 Kinds: off_slide (bbox past the slide edge), overflow (text taller than its box, autofit off),
-overlap (two text shapes crossing, neither containing the other), long_title (> 55 chars).
+overlap (two text shapes crossing, neither containing the other), covered (a filled shape or a
+picture drawn after a text shape crosses it without containing it), long_title (> 55 chars).
 It only reports; it never raises on issues and never blocks a build.
 """
 
@@ -26,13 +27,15 @@ DEFAULT_SIZE_PT = 18.0
 DEFAULT_INSETS = {"lIns": 0.1, "rIns": 0.1, "tIns": 0.05, "bIns": 0.05}  # PowerPoint defaults, inches
 TITLE_MAX_CHARS = 55
 TITLE_PLACEHOLDERS = (PP_PLACEHOLDER.TITLE, PP_PLACEHOLDER.CENTER_TITLE)
+FILLS = tuple(qn(f"a:{k}") for k in ("solidFill", "gradFill", "pattFill", "blipFill", "grpFill"))
+COVER_TOL = 0.01  # inches: overlaps thinner than this (rounding, touching edges) do not count
 
 
 @dataclass
 class Issue:
     slide: int  # 1-based
     shape: str
-    kind: str  # off_slide | overflow | overlap | long_title
+    kind: str  # off_slide | overflow | overlap | covered | long_title
     detail: str
 
     def __str__(self) -> str:
@@ -83,6 +86,23 @@ def _is_title(sh) -> bool:
     return sh.name == "title" or (sh.is_placeholder and sh.placeholder_format.type in TITLE_PLACEHOLDERS)
 
 
+def _opaque(sh) -> bool:
+    """A picture, or an autoshape with a fill (explicit, or from its style when spPr sets none)."""
+    el = sh._element
+    if el.tag == qn("p:pic"):
+        return True
+    if el.tag != qn("p:sp"):
+        return False
+    sppr = el.find(qn("p:spPr"))
+    for child in sppr if sppr is not None else ():
+        if child.tag == qn("a:noFill"):
+            return False
+        if child.tag in FILLS:
+            return True
+    ref = el.find(f"{qn('p:style')}/{qn('a:fillRef')}")
+    return ref is not None and ref.get("idx", "0") != "0"
+
+
 def _crosses(a, b) -> bool:
     """Boxes intersect (positive area) and neither contains the other."""
     if not (a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]):
@@ -94,11 +114,19 @@ def _crosses(a, b) -> bool:
     return not (inside(a, b) or inside(b, a))
 
 
+def _covers(s, t) -> bool:
+    """Box `s` hides part of box `t`: they overlap by more than COVER_TOL and `s` does not contain `t`."""
+    if min(s[2], t[2]) - max(s[0], t[0]) <= COVER_TOL or min(s[3], t[3]) - max(s[1], t[1]) <= COVER_TOL:
+        return False
+    tol = COVER_TOL
+    return not (t[0] >= s[0] - tol and t[1] >= s[1] - tol and t[2] <= s[2] + tol and t[3] <= s[3] + tol)
+
+
 def check_presentation(prs) -> list[Issue]:
     W, H = prs.slide_width / EMU_PER_IN, prs.slide_height / EMU_PER_IN
     issues: list[Issue] = []
     for n, slide in enumerate(prs.slides, 1):
-        texts = []
+        texts, drawn = [], []  # drawn: (name, box, has text, opaque) in z-order
         for sh in slide.shapes:
             box = _bbox(sh)
             text = _text(sh)
@@ -111,11 +139,19 @@ def check_presentation(prs) -> list[Issue]:
                     issues.append(Issue(n, sh.name, "overflow", detail))
                 if text:
                     texts.append((sh.name, box))
+                drawn.append((sh.name, box, bool(text), _opaque(sh)))
             if text and _is_title(sh) and len(text) > TITLE_MAX_CHARS:
                 issues.append(Issue(n, sh.name, "long_title", f"{len(text)} chars (max {TITLE_MAX_CHARS})"))
         for (na, a), (nb, b) in combinations(texts, 2):
             if _crosses(a, b):
                 issues.append(Issue(n, na, "overlap", f"text crosses {nb}"))
+        for i, (nt, t, has_text, _) in enumerate(drawn):
+            if not has_text:
+                continue
+            for ns, s, s_text, opaque in drawn[i + 1:]:
+                # two crossing text shapes are already an overlap
+                if opaque and _covers(s, t) and not (s_text and _crosses(s, t)):
+                    issues.append(Issue(n, nt, "covered", f"covered by {ns}, drawn later"))
     return issues
 
 

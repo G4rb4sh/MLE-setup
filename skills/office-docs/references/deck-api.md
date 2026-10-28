@@ -158,7 +158,7 @@ drawn.
 | Call | Returns |
 | --- | --- |
 | `d.title_slide(kicker, title, subtitle)` | slide |
-| `d.section_slide(number, title, image=None, caption=None)` | slide. `number` is a string, and the kicker reads `SECCIÓN {number}`. An `image` replaces the big number. |
+| `d.section_slide(number, title, image=None, caption=None, kicker="SECCIÓN")` | slide. `number` is a string, and the kicker reads `{kicker} {number}` (`kicker="PART"` gives `PART 02`). An `image` replaces the big number; on a template layout it goes behind the layout's text. |
 | `d.content_slide(kicker, title)` | `(slide, top)`: a header plus a footer with the page number; `top` is where the body starts |
 | `d.final_slide(title, subtitle)` | slide |
 | `d.image_slide(kicker, title, path, caption=None)` | slide: a content slide with one large framed image |
@@ -166,6 +166,7 @@ drawn.
 ```python
 d.title_slide("Sprint 6", "Estado del proyecto", "Revisión con el cliente")
 d.section_slide("02", "Resultados")
+d.section_slide("03", "Next steps", kicker="PART")
 s, top = d.content_slide("Avance", "Lo que cambió esta semana")
 d.final_slide("Gracias", "Preguntas")
 d.image_slide("Evidencia", "Pronóstico vs. real", "photo.png", caption="Semana 42")
@@ -183,10 +184,19 @@ d.footer(s)
 ## Components
 
 They draw full-width rows inside the margins, starting at `top`, which usually
-comes from `content_slide` or `header`. Empty lists raise
-`ZeroDivisionError`, so pass at least one item.
+comes from `content_slide` or `header`. An empty list raises
+`ZeroDivisionError` in `cards_row`, `stat_row`, `timeline`, `chain`,
+`numbered_grid` and `image_row`, so pass at least one item. `maprow`,
+`compare` and `code_block` accept empty lists and draw no items.
 
-**`cards_row(s, top, cards, height=3.2)`**: the items are
+`cards_row`, `compare` and `code_block` take `valign`:
+- `"bias"` (the default) moves the block down by 30% of the free space below
+  it, so a lone block sits a bit lower than `top`.
+- `"top"` starts the block exactly at `top`. Use it to stack blocks.
+
+All three return the y below the block, so the next block can start there.
+
+**`cards_row(s, top, cards, height=3.2, valign="bias") -> y`**: the items are
 `{title, lines, accent?, tag?, icon?}`. The style comes from
 `components.card` and `components.accent_strip`.
 ```python
@@ -197,14 +207,26 @@ d.cards_row(s, top, [
 ])
 ```
 
+**Stacking rows:** pass `valign="top"` and start each row at the y the
+previous one returned. With the default `"bias"`, each row moves down as if it
+were alone on the slide, and the rows overlap.
+```python
+s, top = d.content_slide("Plan", "Dos frentes")
+y = d.cards_row(s, top, [{"title": "Datos", "lines": ["Ingesta diaria"]},
+                         {"title": "Modelo", "lines": ["MAPE 8,4 %"]}], height=2.0, valign="top")
+d.cards_row(s, y + 0.3, [{"title": "API", "lines": ["En diseño"]},
+                         {"title": "Monitoreo", "lines": ["Drift"]}], height=2.0, valign="top")
+```
+
 **`stat_row(s, top, stats)`**: big numbers on `primary` panels. The items are
 `{big, cap}`.
 ```python
 d.stat_row(s, top, [{"big": "8,4 %", "cap": "MAPE semanal"}, {"big": "48", "cap": "tiendas"}])
 ```
 
-**`compare(s, top, ltitle, litems, rtitle, ritems)`**: a neutral "before" on
-the left and a highlighted "after" on the right.
+**`compare(s, top, ltitle, litems, rtitle, ritems, valign="bias") -> y`**: a
+neutral "before" on the left and a highlighted "after" on the right. The
+panels are 3.7 in tall.
 ```python
 d.compare(s, top, "Hoy", ["Planillas a mano", "2 días"], "Con el modelo", ["Automático", "2 horas"])
 ```
@@ -233,8 +255,9 @@ items. Each item is `(num, label)`, and both are strings.
 d.numbered_grid(s, top, [("1", "Acceso a datos"), ("2", "Validar métricas"), ("3", "Piloto"), ("4", "Rollout")])
 ```
 
-**`code_block(s, top, lines, height=3.6, note=None)`**: monospaced lines on a
-`primary` panel. Lines that start with `"# "` are highlighted.
+**`code_block(s, top, lines, height=3.6, note=None, valign="bias") -> y`**:
+monospaced lines on a `primary` panel. Lines that start with `"# "` are
+highlighted. The returned y is below the note when there is one.
 ```python
 d.code_block(s, top, ["# entrenar", "uv run train.py --cfg prod.toml"], height=1.6, note="Corre cada lunes.")
 ```
@@ -289,11 +312,13 @@ a scrim, a 2×2 matrix, a funnel or a before/after with real numbers.
 - **Mix freely.** `content_slide` gives you a header and a footer, and
   `top` is where your own drawing starts. `header()` and `footer()` work on a
   blank slide too.
-- **Text on shapes:** draw the shape, then a `text` box over it with
-  `anchor="middle"`. The layout check ignores shapes without text, so text
-  over a rect is not an overlap. Leave a few hundredths of an inch between
-  text boxes that sit next to each other, because exactly touching boxes can
-  flag as an overlap.
+- **Text on shapes:** draw the shape first, then a `text` box over it with
+  `anchor="middle"`. The layout check flags `covered` when a filled shape or
+  a picture drawn *after* a text box crosses it, because it hides part of the
+  text. A shape drawn before the text (a background) or one that fully
+  contains the text box (a scrim) is fine. Leave a few hundredths of an inch
+  between text boxes that sit next to each other, because exactly touching
+  boxes can flag as an overlap.
 - **Titles:** name your own title shape `"title"` (`d.text(...).name = "title"`)
   so the check warns when it runs past 55 characters.
 - **Colors:** tokens keep the slide on-brand under any `--brand`, while a hex

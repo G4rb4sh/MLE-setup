@@ -111,6 +111,22 @@ def test_assets_resolved(make_brand):
     assert b.layouts == {"title": "Title Slide"}
 
 
+@pytest.mark.parametrize("value", ["../outside.png", "sub/../../outside.png"])
+def test_asset_outside_brand_folder_refused(make_brand, value):
+    folder = make_brand("b", FONTS + f'[logos]\nlight = "{value}"\n')
+    (folder.parent / "outside.png").write_bytes(b"x")
+    (folder / "sub").mkdir()
+    with pytest.raises(BrandError, match="outside the brand folder"):
+        load_brand(folder)
+
+
+def test_absolute_asset_refused(make_brand, tmp_path):
+    (tmp_path / "abs.png").write_bytes(b"x")
+    folder = make_brand("b", FONTS + f'[logos]\nlight = "{tmp_path / "abs.png"}"\n')
+    with pytest.raises(BrandError, match="outside the brand folder"):
+        load_brand(folder)
+
+
 def test_draft_refused(make_brand):
     folder = make_brand("b", "draft = true\n" + FONTS)
     with pytest.raises(BrandError, match="--confirm"):

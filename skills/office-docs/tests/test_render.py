@@ -233,3 +233,12 @@ def test_failed_export_removes_workdir(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError, match="press Esc in Microsoft PowerPoint"):
         export_pdf(src, tmp_path / "deck.pdf")
     assert list((home / PP_CONTAINER).iterdir()) == []
+
+
+def test_close_error_does_not_mask_action_error():
+    copy = Path("/var/x/office-docs-0a1b2c3d.pptx")
+    script = render._office_script("Microsoft PowerPoint", copy, copy.with_suffix(".pdf"))
+    after = script.split("set failure to {m, n}\n    end try\n", 1)[1]
+    assert re.match(r"\s*try\n\s*close presentation nm saving no\n\s*on error m number n\n"
+                    r"\s*if failure is missing value then set failure to \{m, n\}\n\s*end try\n"
+                    r"\s*if failure is not missing value then error", after), after

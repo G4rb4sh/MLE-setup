@@ -71,10 +71,44 @@ def test_overlap_text_only(make_brand):
     s = d.blank_slide()
     d._card_body(s, 1, 1, 4, 3)
     d.text(s, 1.3, 1.2, 3, 1, "dentro de la card")
-    d.rect(s, 4, 2, 3, 1)  # shape without text crossing the card: ignored
+    d.rect(s, 4.5, 2.5, 3, 1)  # crosses the card but not its text: ignored
     d.text(s, 6, 4, 2, 1, "texto")
-    d.rect(s, 5, 3.5, 2, 1)  # crosses the text box, but has no text
+    d.rect(s, 5, 3.5, 2, 1, fill=None, line="accent")  # crosses the text box, but has no text or fill
     assert check_presentation(d.prs) == []
+
+
+def test_covered_by_later_fill_or_picture(make_brand, tmp_path):
+    d = _deck(make_brand, "modern")
+    s = d.blank_slide()
+    d.text(s, 1, 1, 3, 1, "tapado")
+    d.rect(s, 2, 1.5, 3, 1)  # filled, drawn after the text, crosses it
+    s = d.blank_slide()
+    d.text(s, 1, 4, 3, 1, "bajo una imagen")
+    d.image(s, _png(tmp_path / "i.png", 30, 20), 1.5, 4.5, 3, 2, fit="stretch")
+    issues = check_presentation(d.prs)
+    assert [(i.slide, i.kind) for i in issues] == [(1, "covered"), (2, "covered")]
+    assert issues[0].detail.startswith("covered by ")
+
+
+def test_covered_ignores_shapes_behind_or_containing(make_brand):
+    d = _deck(make_brand, "modern")
+    s = d.blank_slide()
+    d.rect(s, 1, 1, 4, 3)  # drawn first: a background
+    d.text(s, 1.5, 1.5, 4, 1, "sobre el fondo")
+    d.text(s, 7, 1, 2, 1, "dentro")
+    d.rect(s, 6.5, 0.5, 3, 2, opacity=30)  # later but fully contains the text (a scrim)
+    d.text(s, 7, 4, 2, 1, "toca")
+    d.rect(s, 9, 4, 1, 1)  # only touches the text box edge
+    assert check_presentation(d.prs) == []
+
+
+def test_two_biased_card_rows_flagged(make_brand):
+    d = _deck(make_brand, "modern")
+    s, top = d.content_slide("k", "Dos filas")
+    row = [{"title": "A", "lines": ["uno", "dos"]}, {"title": "B", "lines": ["tres"]}]
+    d.cards_row(s, top, row, height=2.1)
+    d.cards_row(s, top + 2.1 + 0.3, row, height=2.1)  # caller ignores the bias: rows overlap
+    assert "covered" in _kinds(check_presentation(d.prs))
 
 
 def test_overlap_containment_between_texts(make_brand):

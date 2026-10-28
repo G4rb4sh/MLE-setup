@@ -15,7 +15,7 @@ CLI: `uv run brand_from_pptx.py SRC NAME [--out DIR] [--no-samples]` prints the 
 The brand folder gets:
 - `template.pptx`: SRC with no slides, notes, comments, comment authors, edit history,
   printer settings, thumbnail, customXml or non-label custom properties; core properties and the app.xml
-  Company/Manager cleared, slide titles removed from app.xml. A sensitivity label
+  Company/Manager/HyperlinkBase/Template cleared, slide titles removed from app.xml. A sensitivity label
   (`docMetadata/LabelInfo.xml`, or MSIP_Label_* custom properties) is kept untouched.
 - `assets-review/`: every image used by masters/layouts, and the rendered samples.
 - `brand.toml` with `draft = true` (loading refuses it until `--confirm`), style "outlined":
@@ -25,8 +25,9 @@ The brand folder gets:
   card_border = accent (outlined cards are drawn in the accent); done/planned come from the
   preset. Fonts: theme major latin -> heading, minor latin -> body. Layout roles are guessed
   from layout names.
-The report lists every non-empty text in masters and layouts (placeholder prompts included) so
-a human can spot client data left in the template before confirming.
+The report lists every non-empty text and alt text (shape description and title) in masters and
+layouts (placeholder prompts included) so a human can spot client data left in the template before
+confirming.
 """
 
 from __future__ import annotations
@@ -67,7 +68,7 @@ CORE_FIELDS = ("author", "last_modified_by", "title", "subject", "keywords", "co
 # Presentation-level parts with people, comments, edit history, document or device metadata (not design).
 DROP_PRES_RELS = ("/commentAuthors", "/authors", "/revisionInfo", "/changesInfo", "/customXml",
                   "/printerSettings")
-APP_CLEAR = ("Company", "Manager", "HyperlinkBase")
+APP_CLEAR = ("Company", "Manager", "HyperlinkBase", "Template")  # Template: often a client file path
 APP_DROP = ("HeadingPairs", "TitlesOfParts", "HLinks")  # TitlesOfParts lists slide titles
 APP_ZERO = ("Slides", "Notes", "HiddenSlides", "MMClips", "Words", "Paragraphs")
 LEFTOVERS = re.compile(r"ppt/(slides|notesSlides|comments|changesInfos)/|ppt/(commentAuthors|authors|"
@@ -124,6 +125,10 @@ def _texts(root, where: str) -> list[tuple[str, str]]:
         text = "\n".join(x for x in paras if x.strip()).strip()
         if text:
             out.append((f"{where} / {shape}", text))
+    for cnv in root.iter(qn("p:cNvPr")):  # alt text of any shape, pictures included
+        for attr, label in (("descr", "alt text"), ("title", "alt title")):
+            if alt := (cnv.get(attr) or "").strip():
+                out.append((f"{where} / {cnv.get('name', '')} ({label})", alt))
     return out
 
 
